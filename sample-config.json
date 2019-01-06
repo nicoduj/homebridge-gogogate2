@@ -1,0 +1,53 @@
+{
+    "bridge": {
+        "name": "Homebridge",
+        "username": "CC:22:3D:E3:CE:30",
+        "port": 51826,
+        "pin": "031-45-154"
+    },
+    "description": "This is a sample configuration file showing the capabilities of Http-Garagedoor",
+    "accessories": [
+        {
+            "accessory": "Http-GarageDoor",
+            "name": "Garage Door",
+            "debug": false,
+            "username": "",
+            "password": "",
+            "immediately": false,
+            "polling": true,
+            "pollInterval": 30000,
+            "http_method": "POST",
+            "urls": {
+                "readCurrentState": { "url": "http://localhost:1880/garage/check", "body": "" },
+                "readTargetState": { "url": "http://localhost:1880/garage/check", "body": "" },
+                "setTargetStateOpen": { "url": "http://localhost:1880/garage/setstate", "body": "OPEN" },
+                "setTargetStateClosed": { "url": "http://localhost:1880/garage/setstate", "body": "CLOSED" },
+            },
+            "mappers": [
+                {
+                    "type": "xpath",
+                    "parameters": {
+                        "xpath": "//partition[3]/text()",
+                        "index": 0
+                    }
+                },
+                {
+                    "type": "regex",
+                    "parameters": {
+                        "regexp": "^The door is currently (OPEN|CLOSED), yo!$",
+                        "capture": "1"
+                    }
+                },
+                {
+                    "type": "static",
+                    "parameters": {
+                        "mapping": {
+                            "OPENING": "2",
+                            "CLOSING": "3"
+                        }
+                    }
+                }
+            ]
+        }
+    ]
+}
