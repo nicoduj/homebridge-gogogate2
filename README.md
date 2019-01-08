@@ -8,7 +8,6 @@
 >
 > - Early beginning ...
 
-
 ## Installation
 
 1. Install Homebridge using: `npm install -g homebridge`
@@ -22,7 +21,10 @@
   {
     "platform": "GogoGate2",
     "name": "GogoGate2",
-    "gogogateIP": "192.168.1.47"
+    "gogogateIP": "192.168.1.47",
+    "username": "",
+    "password": "",
+
   }
 ]
 ```
@@ -33,11 +35,11 @@ Fields:
 - `name` is the name of the published accessory (required).
 - `gogogateIP` is the static IP address of the gogogate (required). A static IP address is required.
 
-
 ## Changelog
+
 - 0.0.1
   - [NEW] First version
 
 ## Inspiration
 
-Thanks to [dlbroadfoot/pygogogate2/blob/master/pygogogate2/__init__.py](https://github.com/dlbroadfoot/pygogogate2) for the API calls.
+Thanks to [dlbroadfoot/pygogogate2/blob/master/pygogogate2/**init**.py](https://github.com/dlbroadfoot/pygogogate2) for the API calls.

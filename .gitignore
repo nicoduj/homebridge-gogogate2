@@ -39,4 +39,5 @@ package-lock.json
 node_modules
 .Secret
 
-sample.json
+login.html
+doors.html
