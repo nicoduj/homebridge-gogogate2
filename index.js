@@ -5,7 +5,6 @@ var request = require('request');
 const url = require('url');
 const $ = require('cheerio');
 
-
 String.prototype.isEmpty = function() {
   return this.length === 0 || !this.trim();
 };
@@ -35,9 +34,7 @@ module.exports = function(homebridge) {
 };
 
 Gogogate2Platform.prototype = {
-
-
-  setTimer: function(homebridgeAccessory,on) {
+  setTimer: function(homebridgeAccessory, on) {
     if (this.refreshTimer && this.refreshTimer > 0) {
       if (on && !this.timerID) {
         this.log.debug(
@@ -100,7 +97,7 @@ Gogogate2Platform.prototype = {
           foundAccessories.push(accessory);
 
           //timer for background refresh
-          that.setTimer(accessory,true);
+          that.setTimer(accessory, true);
 
           callback(foundAccessories);
         });
@@ -159,13 +156,16 @@ Gogogate2Platform.prototype = {
     for (var s = 0; s < homebridgeAccessory.services.length; s++) {
       var service = homebridgeAccessory.services[s];
       this.log.debug('Refreshing : ' + service.controlService.subtype);
-      this.refreshDoor(service.controlService);
+      this.refreshDoor(service);
     }
   },
 
   refreshDoor: function(service, callback) {
     var infoURL =
-      'http://' + this.gogogateIP + '/isg/statusDoor.php?numdoor=' + service.id;
+      'http://' +
+      this.gogogateIP +
+      '/isg/statusDoor.php?numdoor=' +
+      service.controlService.id;
 
     var that = this;
 
@@ -176,79 +176,121 @@ Gogogate2Platform.prototype = {
     ) {
       if (statuserror) {
         that.log(
-          'getting status for ' + service.subtype + ' Door failed:',
+          'getting status for ' +
+            service.controlService.subtype +
+            ' Door failed:',
           statuserror
         );
-        if (callback) callback(null, null);
+        if (callback) callback(undefined, undefined);
       } else {
         that.log.debug(
-          'Got Status for : ' + service.subtype + ' - ' + statusbody
+          'Got Status for : ' +
+            service.controlService.subtype +
+            ' - ' +
+            statusbody +
+            ' - ServiceTargetState is ' +
+            service.TargetDoorState
         );
 
-        var newValue =  service.getCharacteristic(Characteristic.CurrentDoorState).value;
+        var newValue = service.controlService.getCharacteristic(
+          Characteristic.CurrentDoorState
+        ).value;
+        var oldValue = newValue;
 
         if (statusbody == 'OK') {
-
-          if (service.TargetDoorState && service.TargetDoorState == Characteristic.CurrentDoorState.OPEN)
-          {
+          if (
+            service.TargetDoorState &&
+            service.TargetDoorState == Characteristic.CurrentDoorState.OPEN
+          ) {
             //operation was in progress and is achieved
-            service.TargetDoorState = null;
+            service.TargetDoorState = undefined;
             newValue = Characteristic.CurrentDoorState.OPEN;
-          }
-          else if (!service.TargetDoorState)
-          {
+            that.log.debug(
+              'OPEN - operation was in progress and is achieved: ' + newValue
+            );
+          } else if (!service.TargetDoorState) {
             //no operation in progress, we retrieve the real state
             newValue = Characteristic.CurrentDoorState.OPEN;
+            that.log.debug(
+              'OPEN - no operation in progress, we retrieve the real state: ' +
+                newValue
+            );
           }
-
         } else {
-
-          if (service.TargetDoorState && service.TargetDoorState == Characteristic.CurrentDoorState.CLOSED)
-          {
+          if (
+            service.TargetDoorState &&
+            service.TargetDoorState == Characteristic.CurrentDoorState.CLOSED
+          ) {
             //operation was in progress and is achieved
-            service.TargetDoorState = null;
+            service.TargetDoorState = undefined;
             newValue = Characteristic.CurrentDoorState.CLOSED;
-          }
-          else if (!service.TargetDoorState)
-          {
+            that.log.debug(
+              'CLOSED - operation was in progress and is achieved ' + newValue
+            );
+          } else if (!service.TargetDoorState) {
             //no operation in progress, we retrieve the real state
             newValue = Characteristic.CurrentDoorState.CLOSED;
+            that.log.debug(
+              'CLOSED - no operation in progress, we retrieve the real state ' +
+                newValue
+            );
           }
         }
 
-        if (callback) callback(null, newValue);
-        else
-          service
+        if (callback) {
+          that.log.debug(
+            'callback: ' + service.controlService.subtype + ' - ' + newValue
+          );
+          callback(undefined, newValue);
+        } else if (newValue != oldValue) {
+          that.log.debug(
+            'update: ' + service.controlService.subtype + ' - ' + newValue
+          );
+
+          service.controlService
             .getCharacteristic(Characteristic.CurrentDoorState)
             .updateValue(newValue);
-
+        } else {
+          that.log.debug('no update needed: ' + service.controlService.subtype);
+        }
       }
     });
   },
 
-  activateDoor: function(service,callback){
-   var commandURL =
-      'http://' + this.gogogateIP + '/isg/opendoor.php?numdoor=' + service.id;
+  activateDoor: function(controlService, callback) {
+    var commandURL =
+      'http://' +
+      this.gogogateIP +
+      '/isg/opendoor.php?numdoor=' +
+      controlService.id;
 
     var that = this;
 
-    var request = require('request'); request = request.defaults({jar: true});
-
+    var request = require('request');
+    request = request.defaults({jar: true});
+    /*
     request(commandURL, function optionalCallback(
       statuserror,
       statusresponse,
       statusbody
     ) {
       if (statuserror) {
-        callback(false);
+        that.log(
+          'ERROR while sending command' + statuserror);
+        callback(true);
       }
       else
       {
-        callback(true);
+        that.log.debug(
+          'Command sent' + controlService.subtype);
+        callback(false);
       }
     });
-  },
+    */
+    that.log.debug('Command sent' + controlService.subtype);
 
+    callback(false);
+  },
 
   bindCharacteristicEvents: function(
     characteristic,
@@ -264,83 +306,111 @@ Gogogate2Platform.prototype = {
     // Characteristic.TargetDoorState.CLOSED = 1
 
     if (characteristic instanceof Characteristic.CurrentDoorState) {
-
-        characteristic.on('get', function(callback) {
-
-          if (service.TargetDoorState && service.TargetDoorState == Characteristic.TargetDoorState.OPEN)
-          {
-            callback(null,Characteristic.CurrentDoorState.OPENING);
-          }
-          else if (service.TargetDoorState && service.TargetDoorState == Characteristic.TargetDoorState.CLOSED)
-          {
-            callback(null,Characteristic.CurrentDoorState.CLOSING);
-          }
-          else
-          {
-            homebridgeAccessory.platform.refreshDoor(
-              service.controlService,
-              callback
+      characteristic.on(
+        'get',
+        function(callback) {
+          if (
+            service.TargetDoorState &&
+            service.TargetDoorState == Characteristic.TargetDoorState.OPEN
+          ) {
+            this.log.debug(
+              'CurrentDoorState callback OPENING ' +
+                service.controlService.subtype
             );
+            callback(undefined, Characteristic.CurrentDoorState.OPENING);
+          } else if (
+            service.TargetDoorState &&
+            service.TargetDoorState == Characteristic.TargetDoorState.CLOSED
+          ) {
+            this.log.debug(
+              'CurrentDoorState callback CLOSING ' +
+                service.controlService.subtype
+            );
+            callback(undefined, Characteristic.CurrentDoorState.CLOSING);
+          } else {
+            this.log.debug(
+              'CurrentDoorState refreshDoor ' + service.controlService.subtype
+            );
+
+            homebridgeAccessory.platform.refreshDoor(service, callback);
           }
-        }.bind(this));
+        }.bind(this)
+      );
+    } else if (characteristic instanceof Characteristic.TargetDoorState) {
+      characteristic.on(
+        'get',
+        function(callback) {
+          if (service.TargetDoorState) {
+            this.log.debug(
+              'TargetDoorState callback with targetDoorState ' +
+                service.controlService.subtype +
+                ' - ' +
+                service.TargetDoorState
+            );
+            callback(undefined, service.TargetDoorState);
+          } else {
+            this.log.debug(
+              'TargetDoorState refreshDoor ' + service.controlService.subtype
+            );
 
-    }
-    else if (characteristic instanceof Characteristic.TargetDoorState) {
+            homebridgeAccessory.platform.refreshDoor(service, callback);
+          }
+        }.bind(this)
+      );
 
-      characteristic.on('get', function(callback) {
-
-        if (service.TargetDoorState)
-        {
-          callback(null, service.TargetDoorState);
-        }
-        else
-        {
+      characteristic.on(
+        'set',
+        function(value, callback, context) {
+          var currentValue = characteristic.value;
           var currentState = service.controlService.getCharacteristic(
             Characteristic.CurrentDoorState
           ).value;
-          callback(null, currentState);
-        }
-      }.bind(this));
 
-      characteristic.on('set', function(value, callback, context) {
-        var currentValue = characteristic.value;
-        var currentState = service.controlService.getCharacteristic(
-          Characteristic.CurrentDoorState
-        ).value;
+          if (
+            currentState != value &&
+            (currentState == Characteristic.CurrentDoorState.OPEN ||
+              currentState == Characteristic.CurrentDoorState.CLOSED)
+          ) {
+            this.log.debug(
+              'TargetDoorState callback with currentstate' +
+                service.controlService.subtype +
+                ' -' +
+                currentState
+            );
 
-        if (currentState != value && (currentState == Characteristic.CurrentDoorState.OPEN || currentState == Characteristic.CurrentDoorState.CLOSED ))
-        {
-          homebridgeAccessory.platform.activateDoor(
-            service.controlService,
-            function(error) {
-              if (!error)
-              {
-                service.TargetDoorState = value;
+            var that = this;
+
+            homebridgeAccessory.platform.activateDoor(
+              service.controlService,
+              function(error) {
+                if (error) {
+                  service.TargetDoorState = undefined;
+                  characteristic.updateValue(currentValue);
+                  that.log.debug(
+                    'error activating ' + service.controlService.subtype
+                  );
+                } else {
+                  service.TargetDoorState = value;
+                  that.log.debug(
+                    'success activating ' +
+                      service.controlService.subtype +
+                      ' - ' +
+                      service.TargetDoorState
+                  );
+                }
               }
-              else
-              {
-                characteristic.updateValue(currentValue);
-              }
-            }
-          );
-        }
-        else // do nothing and revert change since operation is in progress or we target the current state
-        {
-          setTimeout(function() {
-            characteristic.updateValue(currentValue);
-          }, DELAY_TO_UPDATE_STATUS);
-
-        }
-        callback();
-
-      }.bind(this));
-
+            );
+          }
+          callback();
+        }.bind(this)
+      );
     } else if (characteristic instanceof Characteristic.ObstructionDetected) {
-
-      characteristic.on('get', function(callback) {
-        callback(null, false);
-      }.bind(this));
-
+      characteristic.on(
+        'get',
+        function(callback) {
+          callback(undefined, false);
+        }.bind(this)
+      );
     }
   },
 
