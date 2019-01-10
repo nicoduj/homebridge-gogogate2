@@ -17,6 +17,18 @@ function Gogogate2Platform(log, config) {
   this.username = config['username'];
   this.password = config['password'];
   this.refreshTimer = config['refreshTimer'];
+
+  if (!this.refreshTimer || (this.refreshTimer < 5 || this.refreshTimer > 120))
+    this.refreshTimer = 60;
+
+  this.maxWaitTimeForOperation = config['maxWaitTimeForOperation'];
+
+  if (
+    !this.maxWaitTimeForOperation ||
+    (this.maxWaitTimeForOperation < 5 || this.maxWaitTimeForOperation > 60)
+  )
+    this.maxWaitTimeForOperation = 30;
+
   this.doors = [];
   request = request.defaults({jar: true});
   this.log('init');
@@ -34,7 +46,7 @@ module.exports = function(homebridge) {
 };
 
 Gogogate2Platform.prototype = {
-  setTimer: function(homebridgeAccessory, on) {
+  setTimer: function(on) {
     if (this.refreshTimer && this.refreshTimer > 0) {
       if (on && !this.timerID) {
         this.log.debug(
@@ -43,12 +55,13 @@ Gogogate2Platform.prototype = {
             's'
         );
         this.timerID = setInterval(
-          () => this.refreshAllDoors(homebridgeAccessory),
+          () => this.refreshAllDoors(accessory),
           this.refreshTimer * 1000
         );
       } else if (!on && this.timerID) {
         this.log.debug('Clearing Timer');
         clearInterval(this.timerID);
+        this.timerID = undefined;
       }
     }
   },
@@ -97,7 +110,7 @@ Gogogate2Platform.prototype = {
           foundAccessories.push(accessory);
 
           //timer for background refresh
-          that.setTimer(accessory, true);
+          that.setTimer(true);
 
           callback(foundAccessories);
         });
@@ -192,18 +205,24 @@ Gogogate2Platform.prototype = {
             service.TargetDoorState
         );
 
-        var newValue = service.controlService.getCharacteristic(
+        var oldValue = service.controlService.getCharacteristic(
           Characteristic.CurrentDoorState
         ).value;
-        var oldValue = newValue;
+
+        var newValue = undefined;
+
+        that.log.debug('Current Door State ' + oldValue);
 
         if (statusbody == 'OK') {
           if (
             service.TargetDoorState &&
-            service.TargetDoorState == Characteristic.CurrentDoorState.OPEN
+            (service.TargetDoorState == Characteristic.CurrentDoorState.OPEN ||
+              Date.now() - service.TargetDoorStateOperationStart >
+                that.maxWaitTimeForOperation * 1000)
           ) {
-            //operation was in progress and is achieved
-            service.TargetDoorState = undefined;
+            //operation was in progress and is achieved or has timedout
+            that.cancelDoorOperation(service);
+
             newValue = Characteristic.CurrentDoorState.OPEN;
             that.log.debug(
               'OPEN - operation was in progress and is achieved: ' + newValue
@@ -219,10 +238,13 @@ Gogogate2Platform.prototype = {
         } else {
           if (
             service.TargetDoorState &&
-            service.TargetDoorState == Characteristic.CurrentDoorState.CLOSED
+            (service.TargetDoorState ==
+              Characteristic.CurrentDoorState.CLOSED ||
+              Date.now() - service.TargetDoorStateOperationStart >
+                that.maxWaitTimeForOperation)
           ) {
-            //operation was in progress and is achieved
-            service.TargetDoorState = undefined;
+            //operation was in progress and is achieved or has timedout
+            that.cancelDoorOperation(service);
             newValue = Characteristic.CurrentDoorState.CLOSED;
             that.log.debug(
               'CLOSED - operation was in progress and is achieved ' + newValue
@@ -237,6 +259,8 @@ Gogogate2Platform.prototype = {
           }
         }
 
+        if (!newValue) newValue = oldValue;
+
         if (callback) {
           that.log.debug(
             'callback: ' + service.controlService.subtype + ' - ' + newValue
@@ -249,6 +273,10 @@ Gogogate2Platform.prototype = {
 
           service.controlService
             .getCharacteristic(Characteristic.CurrentDoorState)
+            .updateValue(newValue);
+
+          service.controlService
+            .getCharacteristic(Characteristic.TargetDoorState)
             .updateValue(newValue);
         } else {
           that.log.debug('no update needed: ' + service.controlService.subtype);
@@ -268,28 +296,20 @@ Gogogate2Platform.prototype = {
 
     var request = require('request');
     request = request.defaults({jar: true});
-    /*
+
     request(commandURL, function optionalCallback(
       statuserror,
       statusresponse,
       statusbody
     ) {
       if (statuserror) {
-        that.log(
-          'ERROR while sending command' + statuserror);
+        that.log('ERROR while sending command' + statuserror);
         callback(true);
-      }
-      else
-      {
-        that.log.debug(
-          'Command sent' + controlService.subtype);
+      } else {
+        that.log.debug('Command sent' + controlService.subtype);
         callback(false);
       }
     });
-    */
-    that.log.debug('Command sent' + controlService.subtype);
-
-    callback(false);
   },
 
   bindCharacteristicEvents: function(
@@ -384,13 +404,22 @@ Gogogate2Platform.prototype = {
               service.controlService,
               function(error) {
                 if (error) {
-                  service.TargetDoorState = undefined;
+                  that.cancelDoorOperation(service);
                   characteristic.updateValue(currentValue);
                   that.log.debug(
                     'error activating ' + service.controlService.subtype
                   );
                 } else {
-                  service.TargetDoorState = value;
+                  that.operateDoor(service, value);
+
+                  service.controlService
+                    .getCharacteristic(Characteristic.CurrentDoorState)
+                    .updateValue(
+                      currentState == Characteristic.CurrentDoorState.OPEN
+                        ? Characteristic.CurrentDoorState.CLOSING
+                        : Characteristic.CurrentDoorState.OPENING
+                    );
+
                   that.log.debug(
                     'success activating ' +
                       service.controlService.subtype +
@@ -412,6 +441,23 @@ Gogogate2Platform.prototype = {
         }.bind(this)
       );
     }
+  },
+
+  operateDoor(service, state) {
+    //stop timer
+    this.setTimer(false);
+    service.TargetDoorState = state;
+    service.TargetDoorStateOperationStart = Date.now();
+    this.setTimer(true);
+    //start timer
+  },
+  cancelDoorOperation(service) {
+    //stop timer
+    this.setTimer(false);
+    service.TargetDoorState = undefined;
+    service.TargetDoorStateOperationStart = undefined;
+    this.setTimer(true);
+    //start timer
   },
 
   getInformationService: function(homebridgeAccessory) {
