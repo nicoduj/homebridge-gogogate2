@@ -34,9 +34,13 @@ Fields:
 - `platform` must be "GogoGate2" (required).
 - `name` is the name of the published accessory (required).
 - `gogogateIP` is the static IP address of the gogogate (required). A static IP address is required.
+- `refreshTimer` enable refresh of doors state every X seconds, for automation purpose if you need to activate something else based on a state change of a door by another means than homekit. Be aware it might make you gogoggate smokes since the plugin will ask its status very often :) (defaults : disable, accepted range : 30-600s).
+- `maxWaitTimeForOperation` set the maximum time that we wait for door operation to complete. When elapsed, check the current State again and updates accordingly. (defaults : 30s, accepted range : 30-90s).
 
 ## Changelog
 
+- 0.0.2
+  - [NEW] Update and fixes
 - 0.0.1
   - [NEW] First version
 
