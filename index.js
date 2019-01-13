@@ -1,5 +1,3 @@
-OPERATING_CHECK_STATE_DELAY = 10000;
-
 var Service, Characteristic;
 var request = require('request');
 const url = require('url');
@@ -17,6 +15,7 @@ function Gogogate2Platform(log, config, api) {
   this.username = config['username'];
   this.password = config['password'];
   this.refreshTimer = config['refreshTimer'];
+  this.refreshTimerDuringOperartion = config['refreshTimerDuringOperartion'];
 
   if (
     this.refreshTimer &&
@@ -33,8 +32,16 @@ function Gogogate2Platform(log, config, api) {
   )
     this.maxWaitTimeForOperation = 30;
 
+  if (
+    this.refreshTimerDuringOperartion == undefined ||
+    (this.refreshTimerDuringOperartion < 2 ||
+      this.refreshTimerDuringOperartion > 15)
+  )
+    this.refreshTimerDuringOperartion = 10;
+
   this.doors = [];
   request = request.defaults({jar: true});
+
   this.log('init');
 
   if (api) {
@@ -79,6 +86,47 @@ Gogogate2Platform.prototype = {
     else if (state == 2) return 'OPENING';
     else if (state == 3) return 'CLOSING';
     else if (state == 4) return 'STOPPED';
+  },
+
+  handleError(statuserror) {
+    //ERRORS :
+
+    // no network connectivity
+    // ENETUNREACH
+    // EHOSTUNREACH
+
+    // not responding
+    // ETIMEDOUT
+
+    //auth error
+    // ECONNREFUSED
+
+    // if we have a login error, try to reconnect
+    if (statuserror.includes('ECONNREFUSED')) {
+      this.log('handleError - Connection refused, trying to reconnect');
+      this.logout(noerror => {
+        this.login(success => {
+          if (success) {
+            this.log('handleError - Reconnection is ok');
+          }
+        });
+      });
+    }
+    // check for network connectivity
+    else if (
+      statuterror.includes('ENETUNREACH') ||
+      statuterror.includes('EHOSTUNREACH')
+    ) {
+      this.log(
+        'handleError - No network connectivity, check gogogate accessibility'
+      );
+    }
+    //else print error
+    else if (statuterror.includes('ETIMEDOUT')) {
+      this.log(
+        'handleError - timeout connecting to gogogate, check gogogate connectivity'
+      );
+    }
   },
 
   refreshBackground(myGogogateAccessory) {
@@ -172,7 +220,11 @@ Gogogate2Platform.prototype = {
       if (loginerr) {
         that.log('LOGIN - login failed:', loginerr);
         callback(false);
+      } else if (loginbody && loginbody.includes('Wrong login or password')) {
+        that.log('LOGIN - Wrong login or password');
+        callback(false);
       } else {
+        that.log.debug('LOGIN - login ok');
         callback(true);
       }
     });
@@ -193,7 +245,7 @@ Gogogate2Platform.prototype = {
       logoutbody
     ) {
       if (logouterr) {
-        that.log('LOGOUT - logout failed:', logouterr);
+        that.log('LOGOUT - logout failed at shutdown :', logouterr);
         callback(false);
       } else {
         callback(true);
@@ -218,6 +270,7 @@ Gogogate2Platform.prototype = {
         $('input[name="dname3"]', '#config-door3', statusbody).val(),
       ];
       that.log.debug('DOORS NAMES found : ' + that.doors);
+
       callback();
     });
   },
@@ -250,9 +303,9 @@ Gogogate2Platform.prototype = {
         that.log(
           'refreshDoor - Refreshing status for ' +
             service.controlService.subtype +
-            ' Door failed:',
-          statuserror + '. Trying to reconnect'
+            ' Door failed:'
         );
+        that.handleError(statuserror);
 
         if (callback) callback(undefined, undefined);
       } else {
@@ -383,23 +436,18 @@ Gogogate2Platform.prototype = {
 
     var that = this;
 
-    var request = require('request');
-    request = request.defaults({jar: true});
-
     request(commandURL, function optionalCallback(
       statuserror,
       statusresponse,
       statusbody
     ) {
       if (statuserror) {
-        that.log(
-          'activateDoor - ERROR while sending command' +
-            statuserror +
-            '. Trying to reconnect'
-        );
+        that.log('activateDoor - ERROR while sending command');
+        that.handleError(statuserror);
+
         callback(true);
       } else {
-        that.log.debug('activateDoor - Command sent' + controlService.subtype);
+        that.debug('activateDoor - Command sent to ' + controlService.subtype);
         callback(false);
       }
     });
@@ -506,7 +554,7 @@ Gogogate2Platform.prototype = {
                 if (error) {
                   that.endDoorOperation(homebridgeAccessory, service);
                   characteristic.updateValue(currentValue);
-                  that.debug(
+                  that.log.debug(
                     'SET Characteristic.TargetDoorState - ' +
                       service.controlService.subtype +
                       ' error activating '
@@ -564,7 +612,7 @@ Gogogate2Platform.prototype = {
 
     this.timerID = setInterval(() => {
       this.refreshAllDoors(myGogogateAccessory);
-    }, OPERATING_CHECK_STATE_DELAY);
+    }, this.refreshTimerDuringOperartion * 1000);
   },
 
   endDoorOperation(myGogogateAccessory, service) {

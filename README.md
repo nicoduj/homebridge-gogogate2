@@ -27,7 +27,9 @@ This plugin is inteneded to add yours doors connected to gogogate to homekit. It
     "gogogateIP": "192.168.1.47",
     "username": "",
     "password": "",
-
+    "refreshTimer": "120",
+    "maxWaitTimeForOperation": "30s",
+    "refreshTimerDuringOperartion": "5"
   }
 ]
 ```
@@ -39,11 +41,15 @@ Fields:
 - `gogogateIP` is the static IP address of the gogogate (required). A static IP address is required.
 - `username` your username for accessing the gate (must be admin)
 - `password` your password
-- `refreshTimer` enable refresh of doors state every X seconds, for automation purpose if you need to activate something else based on a state change of a door by another means than homekit. Be aware it might make you gogoggate smokes since the plugin will ask its status very often :) (defaults : disable, accepted range : 30-600s).
-- `maxWaitTimeForOperation` set the maximum time that we wait for door operation to complete. When elapsed, check the current State again and updates accordingly. (defaults : 30s, accepted range : 30-90s).
+- `refreshTimer` Optional - enable refresh of doors state every X seconds, for automation purpose if you need to activate something else based on a state change of a door by another means than homekit. Be aware it might make you gogoggate smokes since the plugin will ask its status very often :) (defaults : disable, accepted range : 30-600s).
+- `maxWaitTimeForOperation` Optional - set the maximum time that we wait for door operation to complete. When elapsed, check the current State again and updates accordingly. (defaults : 30s, accepted range : 30-90s).
+- `refreshTimerDuringOperartion` Optional - set the refresh timer during operation in progress to detect the end of the operation. (defaults : 5s, accepted range : 2-15s).
 
 ## Changelog
 
+- 0.0.3
+  - [NEW] New optionnal option for state refresh timer during operation of doors.
+  - [FIX] handling login error.
 - 0.0.2
   - [NEW] Update and fixes
 - 0.0.1
