@@ -150,52 +150,57 @@ Gogogate2Platform.prototype = {
     var that = this;
     this.login(success => {
       if (success) {
-        this.getDoors(() => {
-          var services = [];
+        this.getDoors(successDoors => {
+          if (successDoors) {
+            var services = [];
 
-          for (var i = 0, len = this.doors.length; i < len; i++) {
-            var doorName = this.doors[i];
+            for (var i = 0, len = this.doors.length; i < len; i++) {
+              var doorName = this.doors[i];
 
-            if (doorName && !doorName.isEmpty()) {
-              if (this.devMode) {
-                doorName = 'DEV' + doorName;
+              if (doorName && !doorName.isEmpty()) {
+                if (this.devMode) {
+                  doorName = 'DEV' + doorName;
+                }
+                this.log('Discovered door : ' + doorName);
+
+                var service = {
+                  controlService: new Service.GarageDoorOpener(doorName),
+                  characteristics: [
+                    Characteristic.CurrentDoorState,
+                    Characteristic.TargetDoorState,
+                    Characteristic.ObstructionDetected,
+                  ],
+                };
+                service.controlService.subtype = doorName;
+                service.controlService.id = i + 1;
+                service.id = doorName;
+                services.push(service);
               }
-              this.log('Discovered door : ' + doorName);
-
-              var service = {
-                controlService: new Service.GarageDoorOpener(doorName),
-                characteristics: [
-                  Characteristic.CurrentDoorState,
-                  Characteristic.TargetDoorState,
-                  Characteristic.ObstructionDetected,
-                ],
-              };
-              service.controlService.subtype = doorName;
-              service.controlService.id = i + 1;
-              services.push(service);
             }
+
+            var myGogogateAccessory = new Gogogate2Accessory(services);
+            myGogogateAccessory.getServices = function() {
+              return that.getServices(myGogogateAccessory);
+            };
+            myGogogateAccessory.platform = that;
+            myGogogateAccessory.name = that.name;
+            myGogogateAccessory.model = 'Gogogate2';
+            myGogogateAccessory.manufacturer = 'Gogogate';
+            myGogogateAccessory.serialNumber = that.gogogateIP;
+            foundAccessories.push(myGogogateAccessory);
+
+            //timer for background refresh
+            this.refreshBackground(myGogogateAccessory);
+
+            callback(foundAccessories);
+          } else {
+            //prevent homebridge from starting since we don't want to loose our doors.
+            callback(undefined);
           }
-
-          var myGogogateAccessory = new Gogogate2Accessory(services);
-          myGogogateAccessory.getServices = function() {
-            return that.getServices(myGogogateAccessory);
-          };
-          myGogogateAccessory.platform = that;
-          myGogogateAccessory.name = that.name;
-          myGogogateAccessory.model = 'Gogogate2';
-          myGogogateAccessory.manufacturer = 'Gogogate';
-          myGogogateAccessory.serialNumber = that.gogogateIP;
-          foundAccessories.push(myGogogateAccessory);
-
-          //timer for background refresh
-          this.refreshBackground(myGogogateAccessory);
-
-          callback(foundAccessories);
         });
       } else {
-        this.log('Can not login');
-
-        callback(foundAccessories);
+        //prevent homebridge from starting since we don't want to loose our doors.
+        callback(undefined);
       }
     });
   },
@@ -264,14 +269,18 @@ Gogogate2Platform.prototype = {
       statusresponse,
       statusbody
     ) {
-      that.doors = [
-        $('input[name="dname1"]', '#config-door1', statusbody).val(),
-        $('input[name="dname2"]', '#config-door2', statusbody).val(),
-        $('input[name="dname3"]', '#config-door3', statusbody).val(),
-      ];
-      that.log.debug('DOORS NAMES found : ' + that.doors);
-
-      callback();
+      if (statuserror) {
+        that.log('getDoors - Can not retrieve doors');
+        callback(false);
+      } else {
+        that.doors = [
+          $('input[name="dname1"]', '#config-door1', statusbody).val(),
+          $('input[name="dname2"]', '#config-door2', statusbody).val(),
+          $('input[name="dname3"]', '#config-door3', statusbody).val(),
+        ];
+        that.log.debug('DOORS NAMES found : ' + that.doors);
+        callback(true);
+      }
     });
   },
 

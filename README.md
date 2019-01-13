@@ -8,8 +8,9 @@ This plugin is inteneded to add yours doors connected to gogogate to homekit. It
 
 > List of known issues:
 >
-> - Updating /refreshing might not be reliable
+> - Updating /refreshing might not be always reliable
 > - In case of network loss, not sur it will reconnect
+> - platform is not dynamic, so we brake at startup if gogogate is not reachable / can't give the doors. can be improved.
 
 ## Installation
 
@@ -47,6 +48,8 @@ Fields:
 
 ## Changelog
 
+- 0.0.4
+  - [FIX] PRevent loosing doors if error at homebridge startup (can't login / gogogate unreachable).
 - 0.0.3
   - [NEW] New optionnal option for state refresh timer during operation of doors.
   - [FIX] handling login error.
