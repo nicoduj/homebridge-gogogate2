@@ -456,7 +456,7 @@ Gogogate2Platform.prototype = {
 
         callback(true);
       } else {
-        that.debug('activateDoor - Command sent to ' + controlService.subtype);
+        that.log.debug('activateDoor - Command sent to ' + controlService.subtype);
         callback(false);
       }
     });
