@@ -47,9 +47,10 @@ Fields:
 - `refreshTimerDuringOperartion` Optional - set the refresh timer during operation in progress to detect the end of the operation. (defaults : 5s, accepted range : 2-15s).
 
 ## Changelog
-
+- 0.0.5
+  - [FIX] crash homebridge when activating door
 - 0.0.4
-  - [FIX] PRevent loosing doors if error at homebridge startup (can't login / gogogate unreachable).
+  - [FIX] Prevent loosing doors if error at homebridge startup (can't login / gogogate unreachable).
 - 0.0.3
   - [NEW] New optionnal option for state refresh timer during operation of doors.
   - [FIX] handling login error.
