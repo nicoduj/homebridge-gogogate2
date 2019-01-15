@@ -48,7 +48,7 @@ Fields:
 
 ## Changelog
 
-- 0.0.6
+- 0.0.7
   - [FIX] crash on error
 - 0.0.5
   - [FIX] crash homebridge when activating door
