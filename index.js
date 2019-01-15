@@ -100,9 +100,9 @@ Gogogate2Platform.prototype = {
 
     //auth error
     // ECONNREFUSED
-
+  
     // if we have a login error, try to reconnect
-    if (statuserror.includes('ECONNREFUSED')) {
+    if (statuserror && statuserror.includes('ECONNREFUSED')) {
       this.log('handleError - Connection refused, trying to reconnect');
       this.logout(noerror => {
         this.login(success => {
@@ -113,16 +113,16 @@ Gogogate2Platform.prototype = {
       });
     }
     // check for network connectivity
-    else if (
-      statuterror.includes('ENETUNREACH') ||
-      statuterror.includes('EHOSTUNREACH')
+    else if (statuserror && (
+      statuserror.includes('ENETUNREACH') ||
+      statuserror.includes('EHOSTUNREACH'))
     ) {
       this.log(
         'handleError - No network connectivity, check gogogate accessibility'
       );
     }
     //else print error
-    else if (statuterror.includes('ETIMEDOUT')) {
+    else if (statuserror && statuserror.includes('ETIMEDOUT')) {
       this.log(
         'handleError - timeout connecting to gogogate, check gogogate connectivity'
       );
