@@ -100,7 +100,7 @@ Gogogate2Platform.prototype = {
 
     //auth error
     // ECONNREFUSED
-  
+
     // if we have a login error, try to reconnect
     if (statuserror && statuserror.includes('ECONNREFUSED')) {
       this.log('handleError - Connection refused, trying to reconnect');
@@ -113,16 +113,19 @@ Gogogate2Platform.prototype = {
       });
     }
     // check for network connectivity
-    else if (statuserror && (
-      statuserror.includes('ENETUNREACH') ||
-      statuserror.includes('EHOSTUNREACH'))
+    else if (
+      statuserror &&
+      (statuserror.includes('ENETUNREACH') ||
+        statuserror.includes('EHOSTUNREACH'))
     ) {
+      //Try to send a WOL ?
       this.log(
         'handleError - No network connectivity, check gogogate accessibility'
       );
     }
     //else print error
     else if (statuserror && statuserror.includes('ETIMEDOUT')) {
+      //Try to send a WOL ?
       this.log(
         'handleError - timeout connecting to gogogate, check gogogate connectivity'
       );
@@ -456,7 +459,9 @@ Gogogate2Platform.prototype = {
 
         callback(true);
       } else {
-        that.log.debug('activateDoor - Command sent to ' + controlService.subtype);
+        that.log.debug(
+          'activateDoor - Command sent to ' + controlService.subtype
+        );
         callback(false);
       }
     });

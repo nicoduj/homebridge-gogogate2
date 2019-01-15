@@ -47,6 +47,9 @@ Fields:
 - `refreshTimerDuringOperartion` Optional - set the refresh timer during operation in progress to detect the end of the operation. (defaults : 5s, accepted range : 2-15s).
 
 ## Changelog
+
+- 0.0.6
+  - [FIX] crash on error
 - 0.0.5
   - [FIX] crash homebridge when activating door
 - 0.0.4
