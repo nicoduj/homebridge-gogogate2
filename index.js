@@ -199,7 +199,7 @@ Gogogate2Platform.prototype = {
                   services.push(batteryService);
                 }
 
-                var myGogogateDoorAccessory = new Gogogate2Accessory(services);
+                let myGogogateDoorAccessory = new Gogogate2Accessory(services);
                 myGogogateDoorAccessory.getServices = function() {
                   return this.platform.getServices(myGogogateDoorAccessory);
                 };
@@ -224,7 +224,7 @@ Gogogate2Platform.prototype = {
             tempService.id = this.gogogateIP;
             services.push(tempService);
 
-            var myGogogateAccessory = new Gogogate2Accessory(services);
+            let myGogogateAccessory = new Gogogate2Accessory(services);
             myGogogateAccessory.getServices = function() {
               return this.platform.getServices(myGogogateAccessory);
             };
