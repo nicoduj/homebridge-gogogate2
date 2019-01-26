@@ -48,6 +48,9 @@ Fields:
 
 ## Changelog
 
+- 0.0.8
+  - [NEW] temp sensor and battery level of garage door sensor on doors which have one .
+  - [NEW] moving each door as an accessory - You might need to empty your cache folder .
 - 0.0.7
   - [FIX] crash on error
 - 0.0.5

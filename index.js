@@ -16,6 +16,7 @@ function Gogogate2Platform(log, config, api) {
   this.password = config['password'];
   this.refreshTimer = config['refreshTimer'];
   this.refreshTimerDuringOperartion = config['refreshTimerDuringOperartion'];
+  this.foundAccessories = [];
 
   if (
     this.refreshTimer &&
@@ -56,6 +57,11 @@ function Gogogate2Platform(log, config, api) {
       'shutdown',
       function() {
         that.log('shutdown');
+        if (that.timerID) {
+          clearInterval(that.timerID);
+          that.timerID = undefined;
+        }
+
         that.logout(success => {
           if (success) {
             that.log('log out');
@@ -132,7 +138,7 @@ Gogogate2Platform.prototype = {
     }
   },
 
-  refreshBackground(myGogogateAccessory) {
+  refreshBackground() {
     //timer for background refresh
     if (this.refreshTimer !== undefined && this.refreshTimer > 0) {
       this.log.debug(
@@ -141,24 +147,21 @@ Gogogate2Platform.prototype = {
           's'
       );
       this.timerID = setInterval(
-        () => this.refreshAllDoors(myGogogateAccessory),
+        () => this.refreshAllDoors(),
         this.refreshTimer * 1000
       );
     }
   },
 
   accessories: function(callback) {
-    var foundAccessories = [];
-
-    var that = this;
     this.login(success => {
       if (success) {
         this.getDoors(successDoors => {
           if (successDoors) {
-            var services = [];
-
             for (var i = 0, len = this.doors.length; i < len; i++) {
-              var doorName = this.doors[i];
+              let services = [];
+
+              let doorName = this.doors[i];
 
               if (doorName && !doorName.isEmpty()) {
                 if (this.devMode) {
@@ -166,36 +169,77 @@ Gogogate2Platform.prototype = {
                 }
                 this.log('Discovered door : ' + doorName);
 
-                var service = {
+                let chars = [];
+                chars.push(Characteristic.CurrentDoorState);
+                chars.push(Characteristic.TargetDoorState);
+                chars.push(Characteristic.ObstructionDetected);
+
+                let service = {
                   controlService: new Service.GarageDoorOpener(doorName),
-                  characteristics: [
-                    Characteristic.CurrentDoorState,
-                    Characteristic.TargetDoorState,
-                    Characteristic.ObstructionDetected,
-                  ],
+                  characteristics: chars,
                 };
                 service.controlService.subtype = doorName;
                 service.controlService.id = i + 1;
                 service.id = doorName;
                 services.push(service);
+
+                if (this.sensors[i] && !this.sensors[i].isEmpty()) {
+                  this.log('Discovered sensor : ' + this.sensors[i]);
+                  let batteryService = {
+                    controlService: new Service.BatteryService(),
+                    characteristics: [
+                      Characteristic.BatteryLevel,
+                      Characteristic.ChargingState,
+                      Characteristic.StatusLowBattery,
+                    ],
+                  };
+                  batteryService.controlService.subtype = doorName;
+                  batteryService.controlService.id = i + 1;
+                  batteryService.id = this.sensors[i];
+                  services.push(batteryService);
+                }
+
+                var myGogogateDoorAccessory = new Gogogate2Accessory(services);
+                myGogogateDoorAccessory.getServices = function() {
+                  return this.platform.getServices(myGogogateDoorAccessory);
+                };
+                myGogogateDoorAccessory.platform = this;
+                myGogogateDoorAccessory.name = doorName;
+                myGogogateDoorAccessory.model = 'Gogogate2';
+                myGogogateDoorAccessory.manufacturer = 'Gogogate';
+                myGogogateDoorAccessory.serialNumber =
+                  doorName + '-' + this.gogogateIP;
+
+                this.foundAccessories.push(myGogogateDoorAccessory);
               }
             }
 
+            let services = [];
+            let tempService = {
+              controlService: new Service.TemperatureSensor(),
+              characteristics: [Characteristic.CurrentTemperature],
+            };
+            tempService.controlService.subtype = this.name;
+            tempService.controlService.id = this.gogogateIP;
+            tempService.id = this.gogogateIP;
+            services.push(tempService);
+
             var myGogogateAccessory = new Gogogate2Accessory(services);
             myGogogateAccessory.getServices = function() {
-              return that.getServices(myGogogateAccessory);
+              return this.platform.getServices(myGogogateAccessory);
             };
-            myGogogateAccessory.platform = that;
-            myGogogateAccessory.name = that.name;
+            myGogogateAccessory.platform = this;
+            myGogogateAccessory.name = this.name;
             myGogogateAccessory.model = 'Gogogate2';
             myGogogateAccessory.manufacturer = 'Gogogate';
-            myGogogateAccessory.serialNumber = that.gogogateIP;
-            foundAccessories.push(myGogogateAccessory);
+            myGogogateAccessory.serialNumber = this.gogogateIP;
+
+            this.foundAccessories.push(myGogogateAccessory);
 
             //timer for background refresh
-            this.refreshBackground(myGogogateAccessory);
+            this.refreshBackground();
 
-            callback(foundAccessories);
+            callback(this.foundAccessories);
           } else {
             //prevent homebridge from starting since we don't want to loose our doors.
             callback(undefined);
@@ -281,19 +325,45 @@ Gogogate2Platform.prototype = {
           $('input[name="dname2"]', '#config-door2', statusbody).val(),
           $('input[name="dname3"]', '#config-door3', statusbody).val(),
         ];
+        that.sensors = [
+          $('input[name="door1"]', '#config-door1', statusbody).val(),
+          $('input[name="door2"]', '#config-door2', statusbody).val(),
+          $('input[name="door3"]', '#config-door3', statusbody).val(),
+        ];
         that.log.debug('DOORS NAMES found : ' + that.doors);
         callback(true);
       }
     });
   },
 
-  refreshAllDoors: function(myGogogateAccessory) {
-    for (var s = 0; s < myGogogateAccessory.services.length; s++) {
-      var service = myGogogateAccessory.services[s];
-      this.log.debug(
-        'refreshAllDoors - Door : ' + service.controlService.subtype
-      );
-      this.refreshDoor(myGogogateAccessory, service);
+  refreshAllDoors: function() {
+    this.log.debug('Refreshing status ');
+
+    for (var a = 0; a < this.foundAccessories.length; a++) {
+      var myGogogateAccessory = this.foundAccessories[a];
+
+      for (var s = 0; s < myGogogateAccessory.services.length; s++) {
+        var service = myGogogateAccessory.services[s];
+
+        if (service.controlService instanceof Service.GarageDoorOpener) {
+          this.log.debug(
+            'refreshAllDoors - Door : ' + service.controlService.subtype
+          );
+          this.refreshDoor(myGogogateAccessory, service);
+        } else if (
+          service.controlService instanceof Service.TemperatureSensor
+        ) {
+          this.log.debug(
+            'refreshAllDoors - Temp : ' + service.controlService.subtype
+          );
+          this.refreshTemp(myGogogateAccessory, service);
+        } else if (service.controlService instanceof Service.BatteryService) {
+          this.log.debug(
+            'refreshAllDoors - Battery : ' + service.controlService.subtype
+          );
+          this.refreshBattery(myGogogateAccessory, service);
+        }
+      }
     }
   },
 
@@ -434,6 +504,82 @@ Gogogate2Platform.prototype = {
           service.controlService
             .getCharacteristic(Characteristic.TargetDoorState)
             .updateValue(newValue);
+        }
+      }
+    });
+  },
+
+  refreshTemp: function(myGogogateAccessory, service, callback) {
+    var that = this;
+
+    var infoURL = 'http://' + this.gogogateIP + '/isg/temperature.php?door=1';
+
+    request(infoURL, function optionalCallback(
+      statuserror,
+      statusresponse,
+      statusbody
+    ) {
+      if (statuserror) {
+        that.log('refreshTemp -  failed');
+        that.handleError(statuserror);
+
+        if (callback) callback(undefined, undefined);
+      } else {
+        that.log.debug('refreshTemp with body  : ' + statusbody);
+
+        var res = JSON.parse(statusbody);
+        var newTemp = res[0] / 1000;
+        that.log.debug('refreshTemp with value  : ' + newTemp);
+
+        if (callback) {
+          callback(undefined, newTemp);
+        } else {
+          service.controlService
+            .getCharacteristic(Characteristic.CurrentTemperature)
+            .updateValue(newTemp);
+        }
+      }
+    });
+  },
+
+  refreshBattery: function(myGogogateAccessory, service, callback) {
+    var that = this;
+
+    var infoURL =
+      'http://' +
+      this.gogogateIP +
+      '/isg/temperature.php?door=' +
+      service.controlService.id;
+
+    request(infoURL, function optionalCallback(
+      statuserror,
+      statusresponse,
+      statusbody
+    ) {
+      if (statuserror) {
+        that.log('refreshBattery -  failed');
+        that.handleError(statuserror);
+
+        if (callback) callback(undefined, undefined);
+      } else {
+        that.log.debug('refreshBattery with body  : ' + statusbody);
+        var res = JSON.parse(statusbody);
+
+        var newBatteryLevel = res[1];
+        that.log.debug('refreshBattery with value  : ' + newBatteryLevel);
+
+        if (newBatteryLevel == 'full') {
+          newBatteryLevel = 100;
+        } else if (newBatteryLevel == 'low') {
+          newBatteryLevel = 0;
+        }
+
+        if (callback) {
+          callback(undefined, newBatteryLevel);
+        } else {
+          service.controlService
+            .getCharacteristic(Characteristic.BatteryLevel)
+            .updateValue(newBatteryLevel);
         }
       }
     });
@@ -603,6 +749,47 @@ Gogogate2Platform.prototype = {
           callback(undefined, false);
         }.bind(this)
       );
+    } else if (characteristic instanceof Characteristic.CurrentTemperature) {
+      characteristic.on(
+        'get',
+        function(callback) {
+          homebridgeAccessory.platform.refreshTemp(
+            homebridgeAccessory,
+            service,
+            callback
+          );
+        }.bind(this)
+      );
+    } else if (characteristic instanceof Characteristic.BatteryLevel) {
+      characteristic.on(
+        'get',
+        function(callback) {
+          homebridgeAccessory.platform.refreshBattery(
+            homebridgeAccessory,
+            service,
+            callback
+          );
+        }.bind(this)
+      );
+    } else if (characteristic instanceof Characteristic.ChargingState) {
+      characteristic.on(
+        'get',
+        function(callback) {
+          callback(undefined, false);
+        }.bind(this)
+      );
+    } else if (characteristic instanceof Characteristic.StatusLowBattery) {
+      characteristic.on(
+        'get',
+        function(callback) {
+          callback(
+            undefined,
+            service.controlService.getCharacteristic(
+              Characteristic.BatteryLevel
+            ) == 0
+          );
+        }.bind(this)
+      );
     }
   },
 
@@ -625,7 +812,7 @@ Gogogate2Platform.prototype = {
     );
 
     this.timerID = setInterval(() => {
-      this.refreshAllDoors(myGogogateAccessory);
+      this.refreshAllDoors();
     }, this.refreshTimerDuringOperartion * 1000);
   },
 
@@ -658,7 +845,7 @@ Gogogate2Platform.prototype = {
       if (!operationInProgress) {
         clearInterval(this.timerID);
         this.timerID = undefined;
-        this.refreshBackground(myGogogateAccessory);
+        this.refreshBackground();
       }
     }
   },
