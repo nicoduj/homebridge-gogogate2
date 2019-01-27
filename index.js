@@ -18,7 +18,7 @@ function Gogogate2Platform(log, config, api) {
   this.username = config['username'];
   this.password = config['password'];
   this.refreshTimer = config['refreshTimer'];
-  this.refreshTimerDuringOperartion = config['refreshTimerDuringOperartion'];
+  this.refreshTimerDuringOperation = config['refreshTimerDuringOperation'];
   this.foundAccessories = [];
 
   if (
@@ -37,11 +37,11 @@ function Gogogate2Platform(log, config, api) {
     this.maxWaitTimeForOperation = 30;
 
   if (
-    this.refreshTimerDuringOperartion == undefined ||
-    (this.refreshTimerDuringOperartion < 2 ||
-      this.refreshTimerDuringOperartion > 15)
+    this.refreshTimerDuringOperation == undefined ||
+    (this.refreshTimerDuringOperation < 2 ||
+      this.refreshTimerDuringOperation > 15)
   )
-    this.refreshTimerDuringOperartion = 10;
+    this.refreshTimerDuringOperation = 10;
 
   this.doors = [];
   request = request.defaults({jar: true});
@@ -397,10 +397,11 @@ Gogogate2Platform.prototype = {
         );
 
         //timeout
+        let elapsedTime = Date.now() - service.TargetDoorStateOperationStart;
+
         if (
           service.TargetDoorState !== undefined &&
-          Date.now() - service.TargetDoorStateOperationStart >
-            that.maxWaitTimeForOperation * 1000
+          elapsedTime > that.maxWaitTimeForOperation * 1000
         ) {
           //operation has timedout
           that.endDoorOperation(myGogogateAccessory, service);
@@ -485,7 +486,7 @@ Gogogate2Platform.prototype = {
               that.getStateString(newValue)
           );
           callback(undefined, newValue);
-        } else {
+        } else if (newValue != oldValue) {
           that.log.debug(
             'refreshDoor - ' +
               service.controlService.subtype +
@@ -497,9 +498,14 @@ Gogogate2Platform.prototype = {
             .getCharacteristic(Characteristic.CurrentDoorState)
             .updateValue(newValue);
 
-          service.controlService
-            .getCharacteristic(Characteristic.TargetDoorState)
-            .updateValue(newValue);
+          if (
+            newValue == Characteristic.CurrentDoorState.OPEN ||
+            newValue == Characteristic.CurrentDoorState.CLOSED
+          ) {
+            service.controlService
+              .getCharacteristic(Characteristic.TargetDoorState)
+              .updateValue(newValue);
+          }
         }
       }
     });
@@ -789,7 +795,7 @@ Gogogate2Platform.prototype = {
 
     this.timerID = setInterval(() => {
       this.refreshAllDoors();
-    }, this.refreshTimerDuringOperartion * 1000);
+    }, this.refreshTimerDuringOperation * 1000);
   },
 
   endDoorOperation(myGogogateAccessory, service) {

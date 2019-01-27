@@ -44,10 +44,13 @@ Fields:
 - `password` your password
 - `refreshTimer` Optional - enable refresh of doors state every X seconds, for automation purpose if you need to activate something else based on a state change of a door by another means than homekit. Be aware it might make you gogoggate smokes since the plugin will ask its status very often :) (defaults : disable, accepted range : 30-600s).
 - `maxWaitTimeForOperation` Optional - set the maximum time that we wait for door operation to complete. When elapsed, check the current State again and updates accordingly. (defaults : 30s, accepted range : 30-90s).
-- `refreshTimerDuringOperartion` Optional - set the refresh timer during operation in progress to detect the end of the operation. (defaults : 5s, accepted range : 2-15s).
+- `refreshTimerDuringOperation` Optional - set the refresh timer during operation in progress to detect the end of the operation. (defaults : 10s, accepted range : 2-15s).
 
 ## Changelog
 
+- 0.1.0
+  - [BREAKING] renamed refreshTimerDuringOperartion option to refreshTimerDuringOperation
+  - [FIX] While opening, door might switch from opening to closing in home app before completion of operation #13
 - 0.0.9
   - [FIX] crash with multiple doors #11
   - [FIX] temperature sensor for all sensors #12
