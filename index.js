@@ -1,3 +1,6 @@
+TEMP_SENSOR = 'Temperature';
+BATTERY_SENSOR = 'Battery';
+
 var Service, Characteristic;
 var request = require('request');
 const url = require('url');
@@ -158,9 +161,8 @@ Gogogate2Platform.prototype = {
       if (success) {
         this.getDoors(successDoors => {
           if (successDoors) {
-            for (var i = 0, len = this.doors.length; i < len; i++) {
+            for (let i = 0, len = this.doors.length; i < len; i++) {
               let services = [];
-
               let doorName = this.doors[i];
 
               if (doorName && !doorName.isEmpty()) {
@@ -195,8 +197,17 @@ Gogogate2Platform.prototype = {
                   };
                   batteryService.controlService.subtype = doorName;
                   batteryService.controlService.id = i + 1;
-                  batteryService.id = this.sensors[i];
+                  batteryService.id = 'Battery' + this.sensors[i];
                   services.push(batteryService);
+
+                  let tempService = {
+                    controlService: new Service.TemperatureSensor(),
+                    characteristics: [Characteristic.CurrentTemperature],
+                  };
+                  tempService.controlService.subtype = doorName;
+                  tempService.controlService.id = i + 1;
+                  tempService.id = 'Temp' + this.sensors[i];
+                  services.push(tempService);
                 }
 
                 let myGogogateDoorAccessory = new Gogogate2Accessory(services);
@@ -213,28 +224,6 @@ Gogogate2Platform.prototype = {
                 this.foundAccessories.push(myGogogateDoorAccessory);
               }
             }
-
-            let services = [];
-            let tempService = {
-              controlService: new Service.TemperatureSensor(),
-              characteristics: [Characteristic.CurrentTemperature],
-            };
-            tempService.controlService.subtype = this.name;
-            tempService.controlService.id = this.gogogateIP;
-            tempService.id = this.gogogateIP;
-            services.push(tempService);
-
-            let myGogogateAccessory = new Gogogate2Accessory(services);
-            myGogogateAccessory.getServices = function() {
-              return this.platform.getServices(myGogogateAccessory);
-            };
-            myGogogateAccessory.platform = this;
-            myGogogateAccessory.name = this.name;
-            myGogogateAccessory.model = 'Gogogate2';
-            myGogogateAccessory.manufacturer = 'Gogogate';
-            myGogogateAccessory.serialNumber = this.gogogateIP;
-
-            this.foundAccessories.push(myGogogateAccessory);
 
             //timer for background refresh
             this.refreshBackground();
@@ -253,15 +242,16 @@ Gogogate2Platform.prototype = {
   },
 
   login: function(callback) {
-    var formData = {
+    let formData = {
       login: this.username,
       pass: this.password,
       'sesion-abierta': '1',
       'send-login': 'submit',
     };
-    var baseURL = 'http://' + this.gogogateIP + '/index.php';
+    let baseURL = 'http://' + this.gogogateIP + '/index.php';
 
     var that = this;
+
     that.log.debug('LOGIN - trying to log');
 
     request.post({url: baseURL, formData: formData}, function optionalCallback(
@@ -283,12 +273,13 @@ Gogogate2Platform.prototype = {
   },
 
   logout: function(callback) {
-    var formData = {
+    let formData = {
       logout: 'submit',
     };
-    var baseURL = 'http://' + this.gogogateIP + '/index.php';
+    let baseURL = 'http://' + this.gogogateIP + '/index.php';
 
     var that = this;
+
     that.log.debug('Logout - trying to logout');
 
     request.post({url: baseURL, formData: formData}, function optionalCallback(
@@ -306,7 +297,7 @@ Gogogate2Platform.prototype = {
   },
 
   getDoors: function(callback) {
-    var infoURL =
+    let infoURL =
       'http://' + this.gogogateIP + '/index.php?op=config&opc=doors';
 
     var that = this;
@@ -339,11 +330,11 @@ Gogogate2Platform.prototype = {
   refreshAllDoors: function() {
     this.log.debug('Refreshing status ');
 
-    for (var a = 0; a < this.foundAccessories.length; a++) {
-      var myGogogateAccessory = this.foundAccessories[a];
+    for (let a = 0; a < this.foundAccessories.length; a++) {
+      let myGogogateAccessory = this.foundAccessories[a];
 
-      for (var s = 0; s < myGogogateAccessory.services.length; s++) {
-        var service = myGogogateAccessory.services[s];
+      for (let s = 0; s < myGogogateAccessory.services.length; s++) {
+        let service = myGogogateAccessory.services[s];
 
         if (service.controlService instanceof Service.GarageDoorOpener) {
           this.log.debug(
@@ -356,12 +347,17 @@ Gogogate2Platform.prototype = {
           this.log.debug(
             'refreshAllDoors - Temp : ' + service.controlService.subtype
           );
-          this.refreshTemp(myGogogateAccessory, service);
+          this.refreshSensor(myGogogateAccessory, service, null, TEMP_SENSOR);
         } else if (service.controlService instanceof Service.BatteryService) {
           this.log.debug(
             'refreshAllDoors - Battery : ' + service.controlService.subtype
           );
-          this.refreshBattery(myGogogateAccessory, service);
+          this.refreshSensor(
+            myGogogateAccessory,
+            service,
+            null,
+            BATTERY_SENSOR
+          );
         }
       }
     }
@@ -370,7 +366,7 @@ Gogogate2Platform.prototype = {
   refreshDoor: function(myGogogateAccessory, service, callback) {
     var that = this;
 
-    var infoURL =
+    let infoURL =
       'http://' +
       this.gogogateIP +
       '/isg/statusDoor.php?numdoor=' +
@@ -415,11 +411,11 @@ Gogogate2Platform.prototype = {
           );
         }
 
-        var oldValue = service.controlService.getCharacteristic(
+        let oldValue = service.controlService.getCharacteristic(
           Characteristic.CurrentDoorState
         ).value;
 
-        var newValue = undefined;
+        let newValue = undefined;
 
         that.log.debug(
           'refreshDoor - Current Door State ' + that.getStateString(oldValue)
@@ -509,43 +505,10 @@ Gogogate2Platform.prototype = {
     });
   },
 
-  refreshTemp: function(myGogogateAccessory, service, callback) {
+  refreshSensor: function(myGogogateAccessory, service, callback, type) {
     var that = this;
 
-    var infoURL = 'http://' + this.gogogateIP + '/isg/temperature.php?door=1';
-
-    request(infoURL, function optionalCallback(
-      statuserror,
-      statusresponse,
-      statusbody
-    ) {
-      if (statuserror) {
-        that.log('refreshTemp -  failed');
-        that.handleError(statuserror);
-
-        if (callback) callback(undefined, undefined);
-      } else {
-        that.log.debug('refreshTemp with body  : ' + statusbody);
-
-        var res = JSON.parse(statusbody);
-        var newTemp = res[0] / 1000;
-        that.log.debug('refreshTemp with value  : ' + newTemp);
-
-        if (callback) {
-          callback(undefined, newTemp);
-        } else {
-          service.controlService
-            .getCharacteristic(Characteristic.CurrentTemperature)
-            .updateValue(newTemp);
-        }
-      }
-    });
-  },
-
-  refreshBattery: function(myGogogateAccessory, service, callback) {
-    var that = this;
-
-    var infoURL =
+    let infoURL =
       'http://' +
       this.gogogateIP +
       '/isg/temperature.php?door=' +
@@ -557,36 +520,48 @@ Gogogate2Platform.prototype = {
       statusbody
     ) {
       if (statuserror) {
-        that.log('refreshBattery -  failed');
+        that.log('refreshSensor -  failed');
         that.handleError(statuserror);
 
         if (callback) callback(undefined, undefined);
       } else {
-        that.log.debug('refreshBattery with body  : ' + statusbody);
-        var res = JSON.parse(statusbody);
+        that.log.debug('refreshSensor with body  : ' + statusbody);
+        let res = JSON.parse(statusbody);
 
-        var newBatteryLevel = res[1];
-        that.log.debug('refreshBattery with value  : ' + newBatteryLevel);
+        let newVal;
+        if (type == BATTERY_SENSOR) {
+          newVal = res[1];
+          that.log.debug('refreshBattery with value  : ' + newVal);
 
-        if (newBatteryLevel == 'full') {
-          newBatteryLevel = 100;
-        } else if (newBatteryLevel == 'low') {
-          newBatteryLevel = 0;
+          if (newVal == 'full') {
+            newVal = 100;
+          } else if (newVal == 'low') {
+            newVal = 0;
+          }
+        } else {
+          newVal = res[0] / 1000;
+          that.log.debug('refreshTemp with value  : ' + newVal);
         }
 
         if (callback) {
-          callback(undefined, newBatteryLevel);
+          callback(undefined, newVal);
         } else {
-          service.controlService
-            .getCharacteristic(Characteristic.BatteryLevel)
-            .updateValue(newBatteryLevel);
+          if (type == BATTERY_SENSOR) {
+            service.controlService
+              .getCharacteristic(Characteristic.BatteryLevel)
+              .updateValue(newVal);
+          } else {
+            service.controlService
+              .getCharacteristic(Characteristic.CurrentTemperature)
+              .updateValue(newVal);
+          }
         }
       }
     });
   },
 
   activateDoor: function(controlService, callback) {
-    var commandURL =
+    let commandURL =
       'http://' +
       this.gogogateIP +
       '/isg/opendoor.php?numdoor=' +
@@ -693,6 +668,7 @@ Gogogate2Platform.prototype = {
           var currentState = service.controlService.getCharacteristic(
             Characteristic.CurrentDoorState
           ).value;
+          var that = this;
 
           if (
             currentState != value &&
@@ -705,8 +681,6 @@ Gogogate2Platform.prototype = {
                 ' - CurrentDoorState is ' +
                 this.getStateString(currentState)
             );
-
-            var that = this;
 
             homebridgeAccessory.platform.activateDoor(
               service.controlService,
@@ -753,10 +727,11 @@ Gogogate2Platform.prototype = {
       characteristic.on(
         'get',
         function(callback) {
-          homebridgeAccessory.platform.refreshTemp(
+          homebridgeAccessory.platform.refreshSensor(
             homebridgeAccessory,
             service,
-            callback
+            callback,
+            TEMP_SENSOR
           );
         }.bind(this)
       );
@@ -764,10 +739,11 @@ Gogogate2Platform.prototype = {
       characteristic.on(
         'get',
         function(callback) {
-          homebridgeAccessory.platform.refreshBattery(
+          homebridgeAccessory.platform.refreshSensor(
             homebridgeAccessory,
             service,
-            callback
+            callback,
+            BATTERY_SENSOR
           );
         }.bind(this)
       );
@@ -833,9 +809,9 @@ Gogogate2Platform.prototype = {
   checkEndOperation(myGogogateAccessory) {
     //clear timer and set background again if no other operation in progress
     if (this.timerID) {
-      var operationInProgress = false;
-      for (var s = 0; s < myGogogateAccessory.services.length; s++) {
-        var service = myGogogateAccessory.services[s];
+      let operationInProgress = false;
+      for (let s = 0; s < myGogogateAccessory.services.length; s++) {
+        let service = myGogogateAccessory.services[s];
         if (service.TargetDoorStateOperationStart) {
           operationInProgress = true;
           break;
@@ -851,7 +827,7 @@ Gogogate2Platform.prototype = {
   },
 
   getInformationService: function(homebridgeAccessory) {
-    var informationService = new Service.AccessoryInformation();
+    let informationService = new Service.AccessoryInformation();
     informationService
       .setCharacteristic(Characteristic.Name, homebridgeAccessory.name)
       .setCharacteristic(
@@ -867,15 +843,15 @@ Gogogate2Platform.prototype = {
   },
 
   getServices: function(homebridgeAccessory) {
-    var services = [];
-    var informationService = homebridgeAccessory.platform.getInformationService(
+    let services = [];
+    let informationService = homebridgeAccessory.platform.getInformationService(
       homebridgeAccessory
     );
     services.push(informationService);
-    for (var s = 0; s < homebridgeAccessory.services.length; s++) {
-      var service = homebridgeAccessory.services[s];
-      for (var i = 0; i < service.characteristics.length; i++) {
-        var characteristic = service.controlService.getCharacteristic(
+    for (let s = 0; s < homebridgeAccessory.services.length; s++) {
+      let service = homebridgeAccessory.services[s];
+      for (let i = 0; i < service.characteristics.length; i++) {
+        let characteristic = service.controlService.getCharacteristic(
           service.characteristics[i]
         );
         if (characteristic == undefined)
