@@ -525,13 +525,16 @@ Gogogate2Platform.prototype = {
       statusresponse,
       statusbody
     ) {
-      if (statuserror) {
+      if (statuserror || !IsJsonString(statusbody)) {
         that.log('refreshSensor -  failed');
-        that.handleError(statuserror);
+
+        if (statuserror) that.handleError(statuserror);
+        else that.log('refreshSensor -  no JSON body : ' + statusbody);
 
         if (callback) callback(undefined, undefined);
       } else {
         that.log.debug('refreshSensor with body  : ' + statusbody);
+
         let res = JSON.parse(statusbody);
 
         let newVal;
@@ -878,4 +881,13 @@ Gogogate2Platform.prototype = {
 
 function Gogogate2Accessory(services) {
   this.services = services;
+}
+
+function IsJsonString(str) {
+  try {
+    JSON.parse(str);
+  } catch (e) {
+    return false;
+  }
+  return true;
 }

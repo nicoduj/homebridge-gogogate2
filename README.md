@@ -48,6 +48,8 @@ Fields:
 
 ## Changelog
 
+- 0.1.1
+  - [FIX] handle json parse error for sensor #14
 - 0.1.0
   - [BREAKING] renamed refreshTimerDuringOperartion option to refreshTimerDuringOperation
   - [FIX] While opening, door might switch from opening to closing in home app before completion of operation #13
