@@ -48,6 +48,8 @@ Fields:
 
 ## Changelog
 
+- 0.1.2
+  - [FIX] handle json parse error for sensor #14, new attempt !
 - 0.1.1
   - [FIX] handle json parse error for sensor #14
 - 0.1.0
