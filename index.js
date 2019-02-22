@@ -708,7 +708,9 @@ Gogogate2Platform.prototype = {
               function(error) {
                 if (error) {
                   that.endDoorOperation(homebridgeAccessory, service);
-                  characteristic.updateValue(currentValue);
+                  setTimeout(function() {
+                    characteristic.updateValue(currentValue);
+                  }, 200);
                   that.log.debug(
                     'ERROR - SET Characteristic.TargetDoorState - ' +
                       service.controlService.subtype +
