@@ -2,9 +2,7 @@
 
 [Gogogate 2](https://www.gogogate.com) plugin for [HomeBridge](https://github.com/nfarina/homebridge) using http calls.
 
-> ## Work In Progress
-
-This plugin is inteneded to add yours doors connected to gogogate to homekit. It can update in the background so that openning / closing outside home app can trigger your automations.
+This plugin will add your doors connected to gogogate to homekit. It can update in the background so that openning / closing outside home app can trigger your automations. It will also display battery sensor and temperature from your wireless sensors.
 
 > List of known issues:
 >
