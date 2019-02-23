@@ -10,7 +10,7 @@ This plugin is inteneded to add yours doors connected to gogogate to homekit. It
 >
 > - Updating /refreshing might not be always reliable
 > - In case of network loss, not sur it will reconnect
-> - platform is not dynamic, so we brake at startup if gogogate is not reachable / can't give the doors. can be improved.
+> - platform is not dynamic, so I brake at startup if gogogate is not reachable / can't give the doors. Can be improved.
 
 ## Installation
 
@@ -77,4 +77,25 @@ Fields:
 
 ## Inspiration
 
-Thanks to [dlbroadfoot/pygogogate2/blob/master/pygogogate2/**init**.py](https://github.com/dlbroadfoot/pygogogate2) for the API calls.
+Thanks to :
+- [dlbroadfoot] for the API calls.
+- every tester / contributor that test, and give feedback in any way !
+
+[dlbroadfoot] https://github.com/dlbroadfoot/pygogogate2
+
+
+## Donating
+Support this project and [others by nicoduj][nicoduj-projects] via [PayPal][paypal-nicoduj].
+
+[![Support via PayPal][paypal-button]][paypal-nicoduj]
+
+[nicoduj-projects]: https://github.com/nicoduj/
+[paypal-button]: https://img.shields.io/badge/Donate-PayPal-green.svg
+[paypal-nicoduj]: https://www.paypal.me/nicoduj/2.50
+
+## License
+As of Dec 01 2018, Nicolas Dujardin has released this repository and its contents to the public domain.
+
+It has been released under the [UNLICENSE][].
+
+[UNLICENSE]: LICENSE
