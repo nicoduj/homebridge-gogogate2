@@ -48,6 +48,8 @@ Fields:
 
 ## Changelog
 
+- 0.1.3
+  - [FIX] handle json parse error for sensor #14, new attempt (one more) !
 - 0.1.2
   - [FIX] handle json parse error for sensor #14, new attempt !
 - 0.1.1
@@ -78,13 +80,14 @@ Fields:
 ## Inspiration
 
 Thanks to :
+
 - [dlbroadfoot] for the API calls.
 - every tester / contributor that test, and give feedback in any way !
 
 [dlbroadfoot] https://github.com/dlbroadfoot/pygogogate2
 
-
 ## Donating
+
 Support this project and [others by nicoduj][nicoduj-projects] via [PayPal][paypal-nicoduj].
 
 [![Support via PayPal][paypal-button]][paypal-nicoduj]
@@ -94,8 +97,9 @@ Support this project and [others by nicoduj][nicoduj-projects] via [PayPal][payp
 [paypal-nicoduj]: https://www.paypal.me/nicoduj/2.50
 
 ## License
+
 As of Dec 01 2018, Nicolas Dujardin has released this repository and its contents to the public domain.
 
 It has been released under the [UNLICENSE][].
 
-[UNLICENSE]: LICENSE
+[unlicense]: LICENSE

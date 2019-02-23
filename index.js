@@ -110,8 +110,11 @@ Gogogate2Platform.prototype = {
     this.log.debug(statuserror);
     // if we have a login error, try to reconnect
     if (
-      statuserror &&
-      ((statuserror.code && statuserror.code.includes('ECONNREFUSED')) ||
+      (statuserror &&
+        statuserror.code &&
+        statuserror.code.includes('ECONNREFUSED')) ||
+      (statuserror &&
+        statuserror instanceof String &&
         statuserror.includes('Restricted Access'))
     ) {
       this.log(
