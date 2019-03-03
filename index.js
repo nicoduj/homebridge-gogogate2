@@ -3,7 +3,6 @@ BATTERY_SENSOR = 'Battery';
 
 var Service, Characteristic;
 var request = require('request');
-const url = require('url');
 const $ = require('cheerio');
 
 String.prototype.isEmpty = function() {
@@ -120,7 +119,7 @@ Gogogate2Platform.prototype = {
       this.log(
         'WARNING - handleError - Connection refused, trying to reconnect'
       );
-      this.logout(noerror => {
+      this.logout(() => {
         this.login(success => {
           if (success) {
             this.log('INFO - handleError - Reconnection is ok');
@@ -295,7 +294,10 @@ Gogogate2Platform.prototype = {
       logoutbody
     ) {
       if (logouterr) {
-        that.log('ERROR - LOGOUT - logout failed :', logouterr);
+        that.log(
+          'ERROR - LOGOUT - logout failed :',
+          logouterr + '-' + logoutResponse + '-' + logoutbody
+        );
         callback(false);
       } else {
         callback(true);
@@ -389,7 +391,8 @@ Gogogate2Platform.prototype = {
         that.log(
           'ERROR - refreshDoor - Refreshing status for ' +
             service.controlService.subtype +
-            ' Door failed:'
+            ' Door failed - ' +
+            statusresponse
         );
         that.handleError(statuserror);
 
@@ -599,7 +602,12 @@ Gogogate2Platform.prototype = {
       statusbody
     ) {
       if (statuserror) {
-        that.log('ERROR - activateDoor - ERROR while sending command');
+        that.log(
+          'ERROR - activateDoor - ERROR while sending command -' +
+            statusresponse +
+            '-' +
+            statusbody
+        );
         that.handleError(statuserror);
 
         callback(true);
@@ -687,7 +695,7 @@ Gogogate2Platform.prototype = {
 
       characteristic.on(
         'set',
-        function(value, callback, context) {
+        function(value, callback) {
           var currentValue = characteristic.value;
           var currentState = service.controlService.getCharacteristic(
             Characteristic.CurrentDoorState
