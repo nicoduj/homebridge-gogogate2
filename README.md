@@ -1,5 +1,13 @@
 # homebridge-gogogate2
 
+[![npm](https://img.shields.io/npm/v/homebridge-gogogate2.svg)](https://www.npmjs.com/package/homebridge-gogogate2)
+[![npm](https://img.shields.io/npm/dw/homebridge-gogogate2.svg)](https://www.npmjs.com/package/homebridge-gogogate2)
+[![npm](https://img.shields.io/npm/dt/homebridge-gogogate2.svg)](https://www.npmjs.com/package/homebridge-gogogate2)
+
+[![Build Status](https://travis-ci.com/nicoduj/homebridge-gogogate2.svg?branch=master)](https://travis-ci.com/nicoduj/homebridge-gogogate2)
+[![Known Vulnerabilities](https://snyk.io/test/github/nicoduj/homebridge-gogogate2/badge.svg?targetFile=package.json)](https://snyk.io/test/github/nicoduj/homebridge-gogogate2?targetFile=package.json)
+[![Greenkeeper badge](https://badges.greenkeeper.io/nicoduj/homebridge-gogogate2.svg)](https://greenkeeper.io/)
+
 [Gogogate 2](https://www.gogogate.com) plugin for [HomeBridge](https://github.com/nfarina/homebridge) using http calls.
 
 This plugin will add your doors connected to gogogate to homekit. It can update in the background so that openning / closing outside home app can trigger your automations. It will also display battery sensor and temperature from your wireless sensors.
