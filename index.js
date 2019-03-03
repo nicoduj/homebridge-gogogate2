@@ -41,7 +41,12 @@ function Gogogate2Platform(log, config, api) {
     // Listen to event "didFinishLaunching", this means homebridge already finished loading cached accessories.
     // Platform Plugin should only register new accessory that doesn't exist in homebridge after this event.
     // Or start discover new accessories.
-    this.api.on('shutdown', this.end());
+    this.api.on(
+      'shutdown',
+      function() {
+        this.end();
+      }.bind(this)
+    );
   }
 }
 
@@ -72,7 +77,7 @@ Gogogate2Platform.prototype = {
       this.timerID = undefined;
     }
 
-    this.logout();
+    this.logout(() => {});
   },
 
   handleError(statuserror) {
@@ -460,7 +465,7 @@ Gogogate2Platform.prototype = {
     ).value;
 
     this.log.debug(
-      'INFO - refreshDoor - Current Door State ' + that.getStateString(oldValue)
+      'INFO - refreshDoor - Current Door State ' + this.getStateString(oldValue)
     );
 
     let newValue = this.getNewValue(
@@ -532,12 +537,12 @@ Gogogate2Platform.prototype = {
         that.handleError(statusbody);
         if (callback) callback(undefined, undefined);
       } else {
-        that.handleRefreshSensor(statusbody, callback, type);
+        that.handleRefreshSensor(service, statusbody, callback, type);
       }
     });
   },
 
-  handleRefreshSensor(statusbody, callback, type) {
+  handleRefreshSensor(service, statusbody, callback, type) {
     this.log.debug('INFO - refreshSensor with body  : ' + statusbody);
 
     let res = JSON.parse(statusbody);
