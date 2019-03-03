@@ -16,31 +16,20 @@ function Gogogate2Platform(log, config, api) {
   this.devMode = config['DEVMODE'];
   this.username = config['username'];
   this.password = config['password'];
-  this.refreshTimer = config['refreshTimer'];
-  this.refreshTimerDuringOperation = config['refreshTimerDuringOperation'];
+  this.refreshTimer = checkTimer(config['refreshTimer']);
+  this.refreshTimerDuringOperation = checkParemeter(
+    config['refreshTimerDuringOperation'],
+    2,
+    15,
+    10
+  );
+  this.maxWaitTimeForOperation = checkParemeter(
+    config['maxWaitTimeForOperation'],
+    30,
+    90,
+    30
+  );
   this.foundAccessories = [];
-
-  if (
-    this.refreshTimer &&
-    this.refreshTimer > 0 &&
-    (this.refreshTimer < 30 || this.refreshTimer > 600)
-  )
-    this.refreshTimer = 180;
-
-  this.maxWaitTimeForOperation = config['maxWaitTimeForOperation'];
-
-  if (
-    this.maxWaitTimeForOperation == undefined ||
-    (this.maxWaitTimeForOperation < 30 || this.maxWaitTimeForOperation > 90)
-  )
-    this.maxWaitTimeForOperation = 30;
-
-  if (
-    this.refreshTimerDuringOperation == undefined ||
-    (this.refreshTimerDuringOperation < 2 ||
-      this.refreshTimerDuringOperation > 15)
-  )
-    this.refreshTimerDuringOperation = 10;
 
   this.doors = [];
   request = request.defaults({jar: true});
@@ -52,25 +41,7 @@ function Gogogate2Platform(log, config, api) {
     // Listen to event "didFinishLaunching", this means homebridge already finished loading cached accessories.
     // Platform Plugin should only register new accessory that doesn't exist in homebridge after this event.
     // Or start discover new accessories.
-    var that = this;
-    this.api.on(
-      'shutdown',
-      function() {
-        that.log('INFO - shutdown');
-        if (that.timerID) {
-          clearInterval(that.timerID);
-          that.timerID = undefined;
-        }
-
-        that.logout(success => {
-          if (success) {
-            that.log('INFO - log out');
-          } else {
-            that.log('ERROR - Can not logout');
-          }
-        });
-      }.bind(this)
-    );
+    this.api.on('shutdown', this.end());
   }
 }
 
@@ -92,6 +63,16 @@ Gogogate2Platform.prototype = {
     else if (state == 2) return 'OPENING';
     else if (state == 3) return 'CLOSING';
     else if (state == 4) return 'STOPPED';
+  },
+
+  end() {
+    this.log('INFO - shutdown');
+    if (this.timerID) {
+      clearInterval(this.timerID);
+      this.timerID = undefined;
+    }
+
+    this.logout();
   },
 
   handleError(statuserror) {
@@ -167,70 +148,7 @@ Gogogate2Platform.prototype = {
       if (success) {
         this.getDoors(successDoors => {
           if (successDoors) {
-            for (let i = 0, len = this.doors.length; i < len; i++) {
-              let services = [];
-              let doorName = this.doors[i];
-
-              if (doorName && !doorName.isEmpty()) {
-                if (this.devMode) {
-                  doorName = 'DEV' + doorName;
-                }
-                this.log('INFO - Discovered door : ' + doorName);
-
-                let chars = [];
-                chars.push(Characteristic.CurrentDoorState);
-                chars.push(Characteristic.TargetDoorState);
-                chars.push(Characteristic.ObstructionDetected);
-
-                let service = {
-                  controlService: new Service.GarageDoorOpener(doorName),
-                  characteristics: chars,
-                };
-                service.controlService.subtype = doorName;
-                service.controlService.id = i + 1;
-                service.id = doorName;
-                services.push(service);
-
-                if (this.sensors[i] && !this.sensors[i].isEmpty()) {
-                  this.log('INFO - Discovered sensor : ' + this.sensors[i]);
-                  let batteryService = {
-                    controlService: new Service.BatteryService(),
-                    characteristics: [
-                      Characteristic.BatteryLevel,
-                      Characteristic.ChargingState,
-                      Characteristic.StatusLowBattery,
-                    ],
-                  };
-                  batteryService.controlService.subtype = doorName;
-                  batteryService.controlService.id = i + 1;
-                  batteryService.id = 'Battery' + this.sensors[i];
-                  services.push(batteryService);
-
-                  let tempService = {
-                    controlService: new Service.TemperatureSensor(),
-                    characteristics: [Characteristic.CurrentTemperature],
-                  };
-                  tempService.controlService.subtype = doorName;
-                  tempService.controlService.id = i + 1;
-                  tempService.id = 'Temp' + this.sensors[i];
-                  services.push(tempService);
-                }
-
-                let myGogogateDoorAccessory = new Gogogate2Accessory(services);
-                myGogogateDoorAccessory.getServices = function() {
-                  return this.platform.getServices(myGogogateDoorAccessory);
-                };
-                myGogogateDoorAccessory.platform = this;
-                myGogogateDoorAccessory.name = doorName;
-                myGogogateDoorAccessory.model = 'Gogogate2';
-                myGogogateDoorAccessory.manufacturer = 'Gogogate';
-                myGogogateDoorAccessory.serialNumber =
-                  doorName + '-' + this.gogogateIP;
-
-                this.foundAccessories.push(myGogogateDoorAccessory);
-              }
-            }
-
+            this.handleDoorsDiscovery();
             //timer for background refresh
             this.refreshBackground();
 
@@ -245,6 +163,71 @@ Gogogate2Platform.prototype = {
         callback(undefined);
       }
     });
+  },
+
+  handleDoorsDiscovery() {
+    for (let i = 0, len = this.doors.length; i < len; i++) {
+      let services = [];
+      let doorName = this.doors[i];
+
+      if (doorName && !doorName.isEmpty()) {
+        if (this.devMode) {
+          doorName = 'DEV' + doorName;
+        }
+        this.log('INFO - Discovered door : ' + doorName);
+
+        let chars = [];
+        chars.push(Characteristic.CurrentDoorState);
+        chars.push(Characteristic.TargetDoorState);
+        chars.push(Characteristic.ObstructionDetected);
+
+        let service = {
+          controlService: new Service.GarageDoorOpener(doorName),
+          characteristics: chars,
+        };
+        service.controlService.subtype = doorName;
+        service.controlService.id = i + 1;
+        service.id = doorName;
+        services.push(service);
+
+        if (this.sensors[i] && !this.sensors[i].isEmpty()) {
+          this.log('INFO - Discovered sensor : ' + this.sensors[i]);
+          let batteryService = {
+            controlService: new Service.BatteryService(),
+            characteristics: [
+              Characteristic.BatteryLevel,
+              Characteristic.ChargingState,
+              Characteristic.StatusLowBattery,
+            ],
+          };
+          batteryService.controlService.subtype = doorName;
+          batteryService.controlService.id = i + 1;
+          batteryService.id = 'Battery' + this.sensors[i];
+          services.push(batteryService);
+
+          let tempService = {
+            controlService: new Service.TemperatureSensor(),
+            characteristics: [Characteristic.CurrentTemperature],
+          };
+          tempService.controlService.subtype = doorName;
+          tempService.controlService.id = i + 1;
+          tempService.id = 'Temp' + this.sensors[i];
+          services.push(tempService);
+        }
+
+        let myGogogateDoorAccessory = new Gogogate2Accessory(services);
+        myGogogateDoorAccessory.getServices = function() {
+          return this.platform.getServices(myGogogateDoorAccessory);
+        };
+        myGogogateDoorAccessory.platform = this;
+        myGogogateDoorAccessory.name = doorName;
+        myGogogateDoorAccessory.model = 'Gogogate2';
+        myGogogateDoorAccessory.manufacturer = 'Gogogate';
+        myGogogateDoorAccessory.serialNumber = doorName + '-' + this.gogogateIP;
+
+        this.foundAccessories.push(myGogogateDoorAccessory);
+      }
+    }
   },
 
   login: function(callback) {
@@ -356,21 +339,59 @@ Gogogate2Platform.prototype = {
           this.log.debug(
             'INFO - refreshAllDoors - Temp : ' + service.controlService.subtype
           );
-          this.refreshSensor(myGogogateAccessory, service, null, TEMP_SENSOR);
+          this.refreshSensor(service, null, TEMP_SENSOR);
         } else if (service.controlService instanceof Service.BatteryService) {
           this.log.debug(
             'INFO - refreshAllDoors - Battery : ' +
               service.controlService.subtype
           );
-          this.refreshSensor(
-            myGogogateAccessory,
-            service,
-            null,
-            BATTERY_SENSOR
-          );
+          this.refreshSensor(service, null, BATTERY_SENSOR);
         }
       }
     }
+  },
+
+  getNewValue: function(
+    myGogogateAccessory,
+    service,
+    currentDoorState,
+    oldValue
+  ) {
+    let newValue = undefined;
+
+    if (
+      service.TargetDoorState !== undefined &&
+      service.TargetDoorState == currentDoorState
+    ) {
+      this.endDoorOperation(myGogogateAccessory, service);
+      let newValue = currentDoorState;
+      this.log.debug(
+        'WARNING - refreshDoor - ' +
+          service.controlService.subtype +
+          ' - OPENING operation was in progress and is achieved: ' +
+          this.getStateString(newValue)
+      );
+    } else if (service.TargetDoorState == undefined) {
+      //no operation in progress, we retrieve the real state
+      newValue = currentDoorState;
+      this.log.debug(
+        'INFO - refreshDoor  - ' +
+          service.controlService.subtype +
+          ' - no operation in progress, we retrieve the real state: ' +
+          this.getStateString(newValue)
+      );
+    }
+
+    if (newValue == undefined) {
+      that.log.debug(
+        'INFO - refreshDoor - ' +
+          service.controlService.subtype +
+          ' No new value'
+      );
+      newValue = oldValue;
+    }
+
+    return newValue;
   },
 
   refreshDoor: function(myGogogateAccessory, service, callback) {
@@ -398,134 +419,91 @@ Gogogate2Platform.prototype = {
 
         if (callback) callback(undefined, undefined);
       } else {
-        that.log.debug(
-          'INFO - refreshDoor - Got Status for : ' +
-            service.controlService.subtype +
-            ' - ' +
-            statusbody +
-            '. ServiceTargetState is ' +
-            that.getStateString(service.TargetDoorState)
+        that.handleRefreshDoor(
+          statusbody,
+          myGogogateAccessory,
+          service,
+          callback
         );
-
-        //timeout
-        let elapsedTime = Date.now() - service.TargetDoorStateOperationStart;
-
-        if (
-          service.TargetDoorState !== undefined &&
-          elapsedTime > that.maxWaitTimeForOperation * 1000
-        ) {
-          //operation has timedout
-          that.endDoorOperation(myGogogateAccessory, service);
-          that.log.debug(
-            'WARNING - refreshDoor - ' +
-              service.controlService.subtype +
-              ' - operation was in progress and  has timedout'
-          );
-        }
-
-        let oldValue = service.controlService.getCharacteristic(
-          Characteristic.CurrentDoorState
-        ).value;
-
-        let newValue = undefined;
-
-        that.log.debug(
-          'INFO - refreshDoor - Current Door State ' +
-            that.getStateString(oldValue)
-        );
-
-        if (statusbody == 'OK') {
-          if (
-            service.TargetDoorState !== undefined &&
-            service.TargetDoorState == Characteristic.CurrentDoorState.OPEN
-          ) {
-            that.endDoorOperation(myGogogateAccessory, service);
-            newValue = Characteristic.CurrentDoorState.OPEN;
-            that.log.debug(
-              'WARNING - refreshDoor - ' +
-                service.controlService.subtype +
-                ' - OPENING operation was in progress and is achieved: ' +
-                that.getStateString(newValue)
-            );
-          } else if (service.TargetDoorState == undefined) {
-            //no operation in progress, we retrieve the real state
-            newValue = Characteristic.CurrentDoorState.OPEN;
-            that.log.debug(
-              'INFO - refreshDoor  - ' +
-                service.controlService.subtype +
-                ' - no operation in progress, we retrieve the real state: ' +
-                that.getStateString(newValue)
-            );
-          }
-        } else {
-          if (
-            service.TargetDoorState !== undefined &&
-            service.TargetDoorState == Characteristic.CurrentDoorState.CLOSED
-          ) {
-            //operation was in progress and is achieved or has timedout
-            that.endDoorOperation(myGogogateAccessory, service);
-            newValue = Characteristic.CurrentDoorState.CLOSED;
-            that.log.debug(
-              'INFO - refreshDoor - ' +
-                service.controlService.subtype +
-                ' - CLOSED operation was in progress and is achieved ' +
-                that.getStateString(newValue)
-            );
-          } else if (service.TargetDoorState == undefined) {
-            //no operation in progress, we retrieve the real state
-            newValue = Characteristic.CurrentDoorState.CLOSED;
-            that.log.debug(
-              'INFO - refreshDoor - ' +
-                service.controlService.subtype +
-                ' - no operation in progress, we retrieve the real state ' +
-                that.getStateString(newValue)
-            );
-          }
-        }
-
-        if (newValue == undefined) {
-          that.log.debug(
-            'INFO - refreshDoor - ' +
-              service.controlService.subtype +
-              ' No new value'
-          );
-          newValue = oldValue;
-        }
-
-        if (callback) {
-          that.log.debug(
-            'INFO - refreshDoor - ' +
-              service.controlService.subtype +
-              ' calling callback with value : ' +
-              that.getStateString(newValue)
-          );
-          callback(undefined, newValue);
-        } else if (newValue != oldValue) {
-          that.log.debug(
-            'INFO - refreshDoor - ' +
-              service.controlService.subtype +
-              ' updating characteristics to : ' +
-              that.getStateString(newValue)
-          );
-
-          service.controlService
-            .getCharacteristic(Characteristic.CurrentDoorState)
-            .updateValue(newValue);
-
-          if (
-            newValue == Characteristic.CurrentDoorState.OPEN ||
-            newValue == Characteristic.CurrentDoorState.CLOSED
-          ) {
-            service.controlService
-              .getCharacteristic(Characteristic.TargetDoorState)
-              .updateValue(newValue);
-          }
-        }
       }
     });
   },
 
-  refreshSensor: function(myGogogateAccessory, service, callback, type) {
+  handleRefreshDoor(statusbody, myGogogateAccessory, service, callback) {
+    this.log.debug(
+      'INFO - refreshDoor - Got Status for : ' +
+        service.controlService.subtype +
+        ' - ' +
+        statusbody +
+        '. ServiceTargetState is ' +
+        this.getStateString(service.TargetDoorState)
+    );
+
+    //timeout
+    let elapsedTime = Date.now() - service.TargetDoorStateOperationStart;
+
+    if (
+      service.TargetDoorState !== undefined &&
+      elapsedTime > this.maxWaitTimeForOperation * 1000
+    ) {
+      //operation has timedout
+      this.endDoorOperation(myGogogateAccessory, service);
+      this.log.debug(
+        'WARNING - refreshDoor - ' +
+          service.controlService.subtype +
+          ' - operation was in progress and  has timedout'
+      );
+    }
+
+    let oldValue = service.controlService.getCharacteristic(
+      Characteristic.CurrentDoorState
+    ).value;
+
+    this.log.debug(
+      'INFO - refreshDoor - Current Door State ' + that.getStateString(oldValue)
+    );
+
+    let newValue = this.getNewValue(
+      myGogogateAccessory,
+      service,
+      statusbody == 'OK'
+        ? Characteristic.CurrentDoorState.OPEN
+        : Characteristic.CurrentDoorState.CLOSED,
+      oldValue
+    );
+
+    if (callback) {
+      this.log.debug(
+        'INFO - refreshDoor - ' +
+          service.controlService.subtype +
+          ' calling callback with value : ' +
+          this.getStateString(newValue)
+      );
+      callback(undefined, newValue);
+    } else if (newValue != oldValue) {
+      this.log.debug(
+        'INFO - refreshDoor - ' +
+          service.controlService.subtype +
+          ' updating characteristics to : ' +
+          this.getStateString(newValue)
+      );
+
+      service.controlService
+        .getCharacteristic(Characteristic.CurrentDoorState)
+        .updateValue(newValue);
+
+      if (
+        newValue == Characteristic.CurrentDoorState.OPEN ||
+        newValue == Characteristic.CurrentDoorState.CLOSED
+      ) {
+        service.controlService
+          .getCharacteristic(Characteristic.TargetDoorState)
+          .updateValue(newValue);
+      }
+    }
+  },
+
+  refreshSensor: function(service, callback, type) {
     var that = this;
 
     let infoURL =
@@ -539,52 +517,50 @@ Gogogate2Platform.prototype = {
       statusresponse,
       statusbody
     ) {
-      if (statuserror || !IsJsonString(statusbody)) {
+      if (statuserror) {
         that.log('ERROR - refreshSensor -  failed');
-
-        if (statuserror) {
-          that.handleError(statuserror);
-        } else {
-          that.log('ERROR - refreshSensor -  no JSON body : ' + statusbody);
-          that.handleError(statusbody);
-        }
-
+        that.handleError(statuserror);
+        if (callback) callback(undefined, undefined);
+      } else if (!IsJsonString(statusbody)) {
+        that.log('ERROR - refreshSensor -  failed');
+        that.log(
+          'ERROR - refreshSensor -  no JSON body : ' +
+            statusbody +
+            '-' +
+            statusresponse
+        );
+        that.handleError(statusbody);
         if (callback) callback(undefined, undefined);
       } else {
-        that.log.debug('INFO - refreshSensor with body  : ' + statusbody);
-
-        let res = JSON.parse(statusbody);
-
-        let newVal;
-        if (type == BATTERY_SENSOR) {
-          newVal = res[1];
-          that.log.debug('INFO - refreshBattery with value  : ' + newVal);
-
-          if (newVal == 'full') {
-            newVal = 100;
-          } else if (newVal == 'low') {
-            newVal = 0;
-          }
-        } else {
-          newVal = res[0] / 1000;
-          that.log.debug('INFO - refreshTemp with value  : ' + newVal);
-        }
-
-        if (callback) {
-          callback(undefined, newVal);
-        } else {
-          if (type == BATTERY_SENSOR) {
-            service.controlService
-              .getCharacteristic(Characteristic.BatteryLevel)
-              .updateValue(newVal);
-          } else {
-            service.controlService
-              .getCharacteristic(Characteristic.CurrentTemperature)
-              .updateValue(newVal);
-          }
-        }
+        that.handleRefreshSensor(statusbody, callback, type);
       }
     });
+  },
+
+  handleRefreshSensor(statusbody, callback, type) {
+    this.log.debug('INFO - refreshSensor with body  : ' + statusbody);
+
+    let res = JSON.parse(statusbody);
+
+    let newVal;
+    let charToUpdate = undefined;
+    if (type == BATTERY_SENSOR) {
+      newVal = normalizeBattery(res[1]);
+      charToUpdate = Characteristic.BatteryLevel;
+      this.log.debug('INFO - refreshBattery with value  : ' + newVal);
+    } else {
+      newVal = res[0] / 1000;
+      charToUpdate = Characteristic.CurrentTemperature;
+      this.log.debug('INFO - refreshTemp with value  : ' + newVal);
+    }
+
+    if (callback) {
+      callback(undefined, newVal);
+    } else {
+      service.controlService
+        .getCharacteristic(charToUpdate)
+        .updateValue(newVal);
+    }
   },
 
   activateDoor: function(controlService, callback) {
@@ -620,190 +596,296 @@ Gogogate2Platform.prototype = {
     });
   },
 
+  getCurrentDoorStateCharacteristic: function(
+    homebridgeAccessory,
+    service,
+    callback
+  ) {
+    if (
+      service.TargetDoorState &&
+      service.TargetDoorState == Characteristic.TargetDoorState.OPEN
+    ) {
+      this.log.debug(
+        'INFO - GET Characteristic.CurrentDoorState - ' +
+          service.controlService.subtype +
+          ' - OPENING'
+      );
+      callback(undefined, Characteristic.CurrentDoorState.OPENING);
+    } else if (
+      service.TargetDoorState &&
+      service.TargetDoorState == Characteristic.TargetDoorState.CLOSED
+    ) {
+      this.log.debug(
+        'INFO - GET Characteristic.CurrentDoorState - ' +
+          service.controlService.subtype +
+          ' - CLOSING'
+      );
+      callback(undefined, Characteristic.CurrentDoorState.CLOSING);
+    } else {
+      this.log.debug(
+        'INFO - GET Characteristic.CurrentDoorState - ' +
+          service.controlService.subtype +
+          ' - Real state through REFRESHDOOR'
+      );
+
+      homebridgeAccessory.platform.refreshDoor(
+        homebridgeAccessory,
+        service,
+        callback
+      );
+    }
+  },
+
+  getTargetDoorStateCharacteristic: function(
+    homebridgeAccessory,
+    service,
+    callback
+  ) {
+    if (service.TargetDoorState) {
+      this.log.debug(
+        'INFO - GET Characteristic.TargetDoorState - ' +
+          service.controlService.subtype +
+          ' - callback with state : ' +
+          this.getStateString(service.TargetDoorState)
+      );
+
+      callback(undefined, service.TargetDoorState);
+    } else {
+      this.log.debug(
+        'INFO - GET Characteristic.TargetDoorState - ' +
+          service.controlService.subtype +
+          ' - Real state through REFRESHDOOR'
+      );
+
+      homebridgeAccessory.platform.refreshDoor(
+        homebridgeAccessory,
+        service,
+        callback
+      );
+    }
+  },
+
+  setTargetDoorStateCharacteristic: function(
+    homebridgeAccessory,
+    service,
+    characteristic,
+    value,
+    callback
+  ) {
+    var currentValue = characteristic.value;
+    var currentState = service.controlService.getCharacteristic(
+      Characteristic.CurrentDoorState
+    ).value;
+    var that = this;
+
+    if (
+      currentState != value &&
+      (currentState == Characteristic.CurrentDoorState.OPEN ||
+        currentState == Characteristic.CurrentDoorState.CLOSED)
+    ) {
+      this.log.debug(
+        'INFO - SET Characteristic.TargetDoorState - ' +
+          service.controlService.subtype +
+          ' - CurrentDoorState is ' +
+          this.getStateString(currentState)
+      );
+
+      homebridgeAccessory.platform.activateDoor(
+        service.controlService,
+        function(error) {
+          if (error) {
+            that.endDoorOperation(homebridgeAccessory, service);
+            setTimeout(function() {
+              characteristic.updateValue(currentValue);
+            }, 200);
+            that.log.debug(
+              'ERROR - SET Characteristic.TargetDoorState - ' +
+                service.controlService.subtype +
+                ' error activating '
+            );
+          } else {
+            that.beginDoorOperation(service, value);
+
+            service.controlService
+              .getCharacteristic(Characteristic.CurrentDoorState)
+              .updateValue(
+                currentState == Characteristic.CurrentDoorState.OPEN
+                  ? Characteristic.CurrentDoorState.CLOSING
+                  : Characteristic.CurrentDoorState.OPENING
+              );
+
+            that.log.debug(
+              'INFO - SET Characteristic.TargetDoorState - ' +
+                service.controlService.subtype +
+                ' success activating '
+            );
+          }
+        }
+      );
+    }
+    callback();
+  },
+
+  bindCurrentDoorStateCharacteristic: function(
+    characteristic,
+    service,
+    homebridgeAccessory
+  ) {
+    characteristic.on(
+      'get',
+      function(callback) {
+        homebridgeAccessory.platform.getCurrentDoorStateCharacteristic(
+          homebridgeAccessory,
+          service,
+          callback
+        );
+      }.bind(this)
+    );
+  },
+
+  bindTargetDoorStateCharacteristic: function(
+    characteristic,
+    service,
+    homebridgeAccessory
+  ) {
+    characteristic.on(
+      'get',
+      function(callback) {
+        homebridgeAccessory.platform.getTargetDoorStateCharacteristic(
+          homebridgeAccessory,
+          service,
+          callback
+        );
+      }.bind(this)
+    );
+
+    characteristic.on(
+      'set',
+      function(value, callback) {
+        homebridgeAccessory.platform.setTargetDoorStateCharacteristic(
+          homebridgeAccessory,
+          service,
+          characteristic,
+          value,
+          callback
+        );
+      }.bind(this)
+    );
+  },
+
+  bindObstructionDetectedCharacteristic: function(characteristic) {
+    characteristic.on(
+      'get',
+      function(callback) {
+        callback(undefined, false);
+      }.bind(this)
+    );
+  },
+
+  bindCurrentTemperatureCharacteristic: function(
+    characteristic,
+    service,
+    homebridgeAccessory
+  ) {
+    characteristic.on(
+      'get',
+      function(callback) {
+        homebridgeAccessory.platform.refreshSensor(
+          service,
+          callback,
+          TEMP_SENSOR
+        );
+      }.bind(this)
+    );
+  },
+
+  bindBatteryLevelCharacteristic: function(
+    characteristic,
+    service,
+    homebridgeAccessory
+  ) {
+    characteristic.on(
+      'get',
+      function(callback) {
+        homebridgeAccessory.platform.refreshSensor(
+          service,
+          callback,
+          BATTERY_SENSOR
+        );
+      }.bind(this)
+    );
+  },
+
+  bindChargingStateCharacteristic: function(characteristic) {
+    characteristic.on(
+      'get',
+      function(callback) {
+        callback(undefined, false);
+      }.bind(this)
+    );
+  },
+
+  bindStatusLowBatteryCharacteristic: function(characteristic, service) {
+    characteristic.on(
+      'get',
+      function(callback) {
+        callback(
+          undefined,
+          service.controlService.getCharacteristic(
+            Characteristic.BatteryLevel
+          ) == 0
+        );
+      }.bind(this)
+    );
+  },
+
   bindCharacteristicEvents: function(
     characteristic,
     service,
     homebridgeAccessory
   ) {
-    if (characteristic instanceof Characteristic.CurrentDoorState) {
-      characteristic.on(
-        'get',
-        function(callback) {
-          if (
-            service.TargetDoorState &&
-            service.TargetDoorState == Characteristic.TargetDoorState.OPEN
-          ) {
-            this.log.debug(
-              'INFO - GET Characteristic.CurrentDoorState - ' +
-                service.controlService.subtype +
-                ' - OPENING'
-            );
-            callback(undefined, Characteristic.CurrentDoorState.OPENING);
-          } else if (
-            service.TargetDoorState &&
-            service.TargetDoorState == Characteristic.TargetDoorState.CLOSED
-          ) {
-            this.log.debug(
-              'INFO - GET Characteristic.CurrentDoorState - ' +
-                service.controlService.subtype +
-                ' - CLOSING'
-            );
-            callback(undefined, Characteristic.CurrentDoorState.CLOSING);
-          } else {
-            this.log.debug(
-              'INFO - GET Characteristic.CurrentDoorState - ' +
-                service.controlService.subtype +
-                ' - Real state through REFRESHDOOR'
-            );
-
-            homebridgeAccessory.platform.refreshDoor(
-              homebridgeAccessory,
-              service,
-              callback
-            );
-          }
-        }.bind(this)
-      );
-    } else if (characteristic instanceof Characteristic.TargetDoorState) {
-      characteristic.on(
-        'get',
-        function(callback) {
-          if (service.TargetDoorState) {
-            this.log.debug(
-              'INFO - GET Characteristic.TargetDoorState - ' +
-                service.controlService.subtype +
-                ' - callback with state : ' +
-                this.getStateString(service.TargetDoorState)
-            );
-
-            callback(undefined, service.TargetDoorState);
-          } else {
-            this.log.debug(
-              'INFO - GET Characteristic.TargetDoorState - ' +
-                service.controlService.subtype +
-                ' - Real state through REFRESHDOOR'
-            );
-
-            homebridgeAccessory.platform.refreshDoor(
-              homebridgeAccessory,
-              service,
-              callback
-            );
-          }
-        }.bind(this)
-      );
-
-      characteristic.on(
-        'set',
-        function(value, callback) {
-          var currentValue = characteristic.value;
-          var currentState = service.controlService.getCharacteristic(
-            Characteristic.CurrentDoorState
-          ).value;
-          var that = this;
-
-          if (
-            currentState != value &&
-            (currentState == Characteristic.CurrentDoorState.OPEN ||
-              currentState == Characteristic.CurrentDoorState.CLOSED)
-          ) {
-            this.log.debug(
-              'INFO - SET Characteristic.TargetDoorState - ' +
-                service.controlService.subtype +
-                ' - CurrentDoorState is ' +
-                this.getStateString(currentState)
-            );
-
-            homebridgeAccessory.platform.activateDoor(
-              service.controlService,
-              function(error) {
-                if (error) {
-                  that.endDoorOperation(homebridgeAccessory, service);
-                  setTimeout(function() {
-                    characteristic.updateValue(currentValue);
-                  }, 200);
-                  that.log.debug(
-                    'ERROR - SET Characteristic.TargetDoorState - ' +
-                      service.controlService.subtype +
-                      ' error activating '
-                  );
-                } else {
-                  that.beginDoorOperation(homebridgeAccessory, service, value);
-
-                  service.controlService
-                    .getCharacteristic(Characteristic.CurrentDoorState)
-                    .updateValue(
-                      currentState == Characteristic.CurrentDoorState.OPEN
-                        ? Characteristic.CurrentDoorState.CLOSING
-                        : Characteristic.CurrentDoorState.OPENING
-                    );
-
-                  that.log.debug(
-                    'INFO - SET Characteristic.TargetDoorState - ' +
-                      service.controlService.subtype +
-                      ' success activating '
-                  );
-                }
-              }
-            );
-          }
-          callback();
-        }.bind(this)
-      );
-    } else if (characteristic instanceof Characteristic.ObstructionDetected) {
-      characteristic.on(
-        'get',
-        function(callback) {
-          callback(undefined, false);
-        }.bind(this)
-      );
-    } else if (characteristic instanceof Characteristic.CurrentTemperature) {
-      characteristic.on(
-        'get',
-        function(callback) {
-          homebridgeAccessory.platform.refreshSensor(
-            homebridgeAccessory,
-            service,
-            callback,
-            TEMP_SENSOR
-          );
-        }.bind(this)
-      );
-    } else if (characteristic instanceof Characteristic.BatteryLevel) {
-      characteristic.on(
-        'get',
-        function(callback) {
-          homebridgeAccessory.platform.refreshSensor(
-            homebridgeAccessory,
-            service,
-            callback,
-            BATTERY_SENSOR
-          );
-        }.bind(this)
-      );
-    } else if (characteristic instanceof Characteristic.ChargingState) {
-      characteristic.on(
-        'get',
-        function(callback) {
-          callback(undefined, false);
-        }.bind(this)
-      );
-    } else if (characteristic instanceof Characteristic.StatusLowBattery) {
-      characteristic.on(
-        'get',
-        function(callback) {
-          callback(
-            undefined,
-            service.controlService.getCharacteristic(
-              Characteristic.BatteryLevel
-            ) == 0
-          );
-        }.bind(this)
-      );
+    switch (true) {
+      case characteristic instanceof Characteristic.CurrentDoorState:
+        this.bindCurrentDoorStateCharacteristic(
+          characteristic,
+          service,
+          homebridgeAccessory
+        );
+        break;
+      case characteristic instanceof Characteristic.TargetDoorState:
+        this.bindTargetDoorStateCharacteristic(
+          characteristic,
+          service,
+          homebridgeAccessory
+        );
+        break;
+      case characteristic instanceof Characteristic.ObstructionDetected:
+        this.bindObstructionDetectedCharacteristic(characteristic);
+        break;
+      case characteristic instanceof Characteristic.CurrentTemperature:
+        this.bindCurrentTemperatureCharacteristic(
+          characteristic,
+          service,
+          homebridgeAccessory
+        );
+        break;
+      case characteristic instanceof Characteristic.BatteryLevel:
+        this.bindBatteryLevelCharacteristic(
+          characteristic,
+          service,
+          homebridgeAccessory
+        );
+        break;
+      case characteristic instanceof Characteristic.ChargingState:
+        this.bindChargingStateCharacteristic(characteristic);
+        break;
+      case characteristic instanceof Characteristic.StatusLowBattery:
+        this.bindStatusLowBatteryCharacteristic(characteristic, service);
+        break;
     }
   },
 
-  beginDoorOperation(myGogogateAccessory, service, state) {
+  beginDoorOperation(service, state) {
     //stop timer if one exists.
 
     if (this.timerID) {
@@ -915,4 +997,25 @@ function IsJsonString(str) {
     return false;
   }
   return true;
+}
+
+function checkTimer(timer) {
+  if (timer && timer > 0 && (timer < 30 || timer > 600)) return 180;
+  else return timer;
+}
+
+function checkParemeter(parameter, min, max, def) {
+  if (parameter == undefined || (parameter < min || parameter > max))
+    return def;
+  else return parameter;
+}
+
+function normalizeBattery(val) {
+  if (val == 'full') {
+    return 100;
+  } else if (val == 'low') {
+    return 0;
+  } else {
+    return val;
+  }
 }
