@@ -787,36 +787,16 @@ Gogogate2Platform.prototype = {
     );
   },
 
-  bindCurrentTemperatureCharacteristic: function(
+  bindSensorCharacteristic: function(
     characteristic,
     service,
-    homebridgeAccessory
+    homebridgeAccessory,
+    type
   ) {
     characteristic.on(
       'get',
       function(callback) {
-        homebridgeAccessory.platform.refreshSensor(
-          service,
-          callback,
-          TEMP_SENSOR
-        );
-      }.bind(this)
-    );
-  },
-
-  bindBatteryLevelCharacteristic: function(
-    characteristic,
-    service,
-    homebridgeAccessory
-  ) {
-    characteristic.on(
-      'get',
-      function(callback) {
-        homebridgeAccessory.platform.refreshSensor(
-          service,
-          callback,
-          BATTERY_SENSOR
-        );
+        homebridgeAccessory.platform.refreshSensor(service, callback, type);
       }.bind(this)
     );
   },
@@ -868,17 +848,19 @@ Gogogate2Platform.prototype = {
         this.bindObstructionDetectedCharacteristic(characteristic);
         break;
       case characteristic instanceof Characteristic.CurrentTemperature:
-        this.bindCurrentTemperatureCharacteristic(
+        this.bindSensorCharacteristic(
           characteristic,
           service,
-          homebridgeAccessory
+          homebridgeAccessory,
+          TEMP_SENSOR
         );
         break;
       case characteristic instanceof Characteristic.BatteryLevel:
-        this.bindBatteryLevelCharacteristic(
+        this.bindSensorCharacteristic(
           characteristic,
           service,
-          homebridgeAccessory
+          homebridgeAccessory,
+          BATTERY_SENSOR
         );
         break;
       case characteristic instanceof Characteristic.ChargingState:
