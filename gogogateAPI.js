@@ -14,7 +14,7 @@ function GogogateAPI(log, platform) {
   request = request.defaults({jar: true});
 }
 
-function isLoginError(statusError) {
+function isLoginError(statuserror) {
   return (
     (statuserror &&
       statuserror.code &&
