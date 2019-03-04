@@ -1,5 +1,6 @@
 var request = require('request');
 const $ = require('cheerio');
+const GogogateTools = require('./gogogateTools.js');
 
 module.exports = {
   GogogateAPI: GogogateAPI,
