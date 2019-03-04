@@ -1,9 +1,8 @@
-TEMP_SENSOR = 'Temperature';
-BATTERY_SENSOR = 'Battery';
-
 var Service, Characteristic;
-var request = require('request');
-const $ = require('cheerio');
+
+var GogogateAPI = require('./gogogateAPI.js').GogogateAPI;
+const GogogateConst = require('./gogogateConst');
+const GogogateTools = require('./gogogateTools.js');
 
 String.prototype.isEmpty = function() {
   return this.length === 0 || !this.trim();
@@ -16,14 +15,14 @@ function Gogogate2Platform(log, config, api) {
   this.devMode = config['DEVMODE'];
   this.username = config['username'];
   this.password = config['password'];
-  this.refreshTimer = checkTimer(config['refreshTimer']);
-  this.refreshTimerDuringOperation = checkParemeter(
+  this.refreshTimer = GogogateTools.checkTimer(config['refreshTimer']);
+  this.refreshTimerDuringOperation = GogogateTools.checkParemeter(
     config['refreshTimerDuringOperation'],
     2,
     15,
     10
   );
-  this.maxWaitTimeForOperation = checkParemeter(
+  this.maxWaitTimeForOperation = GogogateTools.checkParemeter(
     config['maxWaitTimeForOperation'],
     30,
     90,
@@ -32,7 +31,8 @@ function Gogogate2Platform(log, config, api) {
   this.foundAccessories = [];
 
   this.doors = [];
-  request = request.defaults({jar: true});
+
+  this.gogogateAPI = new GogogateAPI(log, this);
 
   if (api) {
     // Save the API object as plugin needs to register new accessory via this object
@@ -62,14 +62,6 @@ module.exports = function(homebridge) {
 };
 
 Gogogate2Platform.prototype = {
-  getStateString(state) {
-    if (state == 0) return 'OPEN';
-    else if (state == 1) return 'CLOSED';
-    else if (state == 2) return 'OPENING';
-    else if (state == 3) return 'CLOSING';
-    else if (state == 4) return 'STOPPED';
-  },
-
   end() {
     this.log('INFO - shutdown');
     if (this.timerID) {
@@ -77,60 +69,7 @@ Gogogate2Platform.prototype = {
       this.timerID = undefined;
     }
 
-    this.logout(() => {});
-  },
-
-  handleError(statuserror) {
-    //ERRORS :
-
-    // no network connectivity
-    // ENETUNREACH
-    // EHOSTUNREACH
-
-    // not responding
-    // ETIMEDOUT
-
-    //auth error
-    // ECONNREFUSED
-    this.log.debug(statuserror);
-    // if we have a login error, try to reconnect
-    if (
-      (statuserror &&
-        statuserror.code &&
-        statuserror.code.includes('ECONNREFUSED')) ||
-      (statuserror &&
-        statuserror instanceof String &&
-        statuserror.includes('Restricted Access'))
-    ) {
-      this.log(
-        'WARNING - handleError - Connection refused, trying to reconnect'
-      );
-      this.logout(() => {
-        this.login(success => {
-          if (success) {
-            this.log('INFO - handleError - Reconnection is ok');
-          }
-        });
-      });
-    }
-    // check for network connectivity
-    else if (
-      statuserror &&
-      (statuserror.code.includes('ENETUNREACH') ||
-        statuserror.code.includes('EHOSTUNREACH'))
-    ) {
-      //Try to send a WOL ?
-      this.log(
-        'ERROR - handleError - No network connectivity, check gogogate accessibility'
-      );
-    }
-    //else print error
-    else if (statuserror && statuserror.code.includes('ETIMEDOUT')) {
-      //Try to send a WOL ?
-      this.log(
-        'ERROR - handleError - timeout connecting to gogogate, check gogogate connectivity'
-      );
-    }
+    this.gogogateAPI.logout(() => {});
   },
 
   refreshBackground() {
@@ -149,9 +88,9 @@ Gogogate2Platform.prototype = {
   },
 
   accessories: function(callback) {
-    this.login(success => {
+    this.gogogateAPI.login(success => {
       if (success) {
-        this.getDoors(successDoors => {
+        this.gogogateAPI.getDoors(successDoors => {
           if (successDoors) {
             this.handleDoorsDiscovery();
             //timer for background refresh
@@ -220,7 +159,9 @@ Gogogate2Platform.prototype = {
           services.push(tempService);
         }
 
-        let myGogogateDoorAccessory = new Gogogate2Accessory(services);
+        let myGogogateDoorAccessory = new GogogateTools.Gogogate2Accessory(
+          services
+        );
         myGogogateDoorAccessory.getServices = function() {
           return this.platform.getServices(myGogogateDoorAccessory);
         };
@@ -233,95 +174,6 @@ Gogogate2Platform.prototype = {
         this.foundAccessories.push(myGogogateDoorAccessory);
       }
     }
-  },
-
-  login: function(callback) {
-    let formData = {
-      login: this.username,
-      pass: this.password,
-      'sesion-abierta': '1',
-      'send-login': 'submit',
-    };
-    let baseURL = 'http://' + this.gogogateIP + '/index.php';
-
-    var that = this;
-
-    that.log.debug('INFO - LOGIN - trying to log');
-
-    request.post({url: baseURL, formData: formData}, function optionalCallback(
-      loginerr,
-      loginResponse,
-      loginbody
-    ) {
-      if (loginerr) {
-        that.log('ERROR - LOGIN - login failed:', loginerr);
-        callback(false);
-      } else if (loginbody && loginbody.includes('Wrong login or password')) {
-        that.log('ERROR - LOGIN - Wrong login or password');
-        callback(false);
-      } else {
-        that.log.debug('INFO - LOGIN - login ok');
-        callback(true);
-      }
-    });
-  },
-
-  logout: function(callback) {
-    let formData = {
-      logout: 'submit',
-    };
-    let baseURL = 'http://' + this.gogogateIP + '/index.php';
-
-    var that = this;
-
-    that.log.debug('INFO - Logout - trying to logout');
-
-    request.post({url: baseURL, formData: formData}, function optionalCallback(
-      logouterr,
-      logoutResponse,
-      logoutbody
-    ) {
-      if (logouterr) {
-        that.log(
-          'ERROR - LOGOUT - logout failed :',
-          logouterr + '-' + logoutResponse + '-' + logoutbody
-        );
-        callback(false);
-      } else {
-        callback(true);
-      }
-    });
-  },
-
-  getDoors: function(callback) {
-    let infoURL =
-      'http://' + this.gogogateIP + '/index.php?op=config&opc=doors';
-
-    var that = this;
-
-    request(infoURL, function optionalCallback(
-      statuserror,
-      statusresponse,
-      statusbody
-    ) {
-      if (statuserror) {
-        that.log('ERROR - getDoors - Can not retrieve doors');
-        callback(false);
-      } else {
-        that.doors = [
-          $('input[name="dname1"]', '#config-door1', statusbody).val(),
-          $('input[name="dname2"]', '#config-door2', statusbody).val(),
-          $('input[name="dname3"]', '#config-door3', statusbody).val(),
-        ];
-        that.sensors = [
-          $('input[name="door1"]', '#config-door1', statusbody).val(),
-          $('input[name="door2"]', '#config-door2', statusbody).val(),
-          $('input[name="door3"]', '#config-door3', statusbody).val(),
-        ];
-        that.log.debug('INFO - DOORS NAMES found : ' + that.doors);
-        callback(true);
-      }
-    });
   },
 
   refreshAllDoors: function() {
@@ -337,20 +189,28 @@ Gogogate2Platform.prototype = {
           this.log.debug(
             'INFO - refreshAllDoors - Door : ' + service.controlService.subtype
           );
-          this.refreshDoor(myGogogateAccessory, service);
+          this.gogogateAPI.refreshDoor(myGogogateAccessory, service);
         } else if (
           service.controlService instanceof Service.TemperatureSensor
         ) {
           this.log.debug(
             'INFO - refreshAllDoors - Temp : ' + service.controlService.subtype
           );
-          this.refreshSensor(service, null, TEMP_SENSOR);
+          this.gogogateAPI.refreshSensor(
+            service,
+            null,
+            GogogateConst.TEMP_SENSOR
+          );
         } else if (service.controlService instanceof Service.BatteryService) {
           this.log.debug(
             'INFO - refreshAllDoors - Battery : ' +
               service.controlService.subtype
           );
-          this.refreshSensor(service, null, BATTERY_SENSOR);
+          this.gogogateAPI.refreshSensor(
+            service,
+            null,
+            GogogateConst.BATTERY_SENSOR
+          );
         }
       }
     }
@@ -374,7 +234,7 @@ Gogogate2Platform.prototype = {
         'WARNING - refreshDoor - ' +
           service.controlService.subtype +
           ' - OPENING operation was in progress and is achieved: ' +
-          this.getStateString(newValue)
+          this.gogogateAPI.getStateString(newValue)
       );
     } else if (service.TargetDoorState == undefined) {
       //no operation in progress, we retrieve the real state
@@ -383,7 +243,7 @@ Gogogate2Platform.prototype = {
         'INFO - refreshDoor  - ' +
           service.controlService.subtype +
           ' - no operation in progress, we retrieve the real state: ' +
-          this.getStateString(newValue)
+          this.gogogateAPI.getStateString(newValue)
       );
     }
 
@@ -399,41 +259,6 @@ Gogogate2Platform.prototype = {
     return newValue;
   },
 
-  refreshDoor: function(myGogogateAccessory, service, callback) {
-    var that = this;
-
-    let infoURL =
-      'http://' +
-      this.gogogateIP +
-      '/isg/statusDoor.php?numdoor=' +
-      service.controlService.id;
-
-    request(infoURL, function optionalCallback(
-      statuserror,
-      statusresponse,
-      statusbody
-    ) {
-      if (statuserror) {
-        that.log(
-          'ERROR - refreshDoor - Refreshing status for ' +
-            service.controlService.subtype +
-            ' Door failed - ' +
-            statusresponse
-        );
-        that.handleError(statuserror);
-
-        if (callback) callback(undefined, undefined);
-      } else {
-        that.handleRefreshDoor(
-          statusbody,
-          myGogogateAccessory,
-          service,
-          callback
-        );
-      }
-    });
-  },
-
   handleRefreshDoor(statusbody, myGogogateAccessory, service, callback) {
     this.log.debug(
       'INFO - refreshDoor - Got Status for : ' +
@@ -441,7 +266,7 @@ Gogogate2Platform.prototype = {
         ' - ' +
         statusbody +
         '. ServiceTargetState is ' +
-        this.getStateString(service.TargetDoorState)
+        this.gogogateAPI.getStateString(service.TargetDoorState)
     );
 
     //timeout
@@ -465,7 +290,8 @@ Gogogate2Platform.prototype = {
     ).value;
 
     this.log.debug(
-      'INFO - refreshDoor - Current Door State ' + this.getStateString(oldValue)
+      'INFO - refreshDoor - Current Door State ' +
+        this.gogogateAPI.getStateString(oldValue)
     );
 
     let newValue = this.getNewValue(
@@ -482,7 +308,7 @@ Gogogate2Platform.prototype = {
         'INFO - refreshDoor - ' +
           service.controlService.subtype +
           ' calling callback with value : ' +
-          this.getStateString(newValue)
+          this.gogogateAPI.getStateString(newValue)
       );
       callback(undefined, newValue);
     } else if (newValue != oldValue) {
@@ -490,7 +316,7 @@ Gogogate2Platform.prototype = {
         'INFO - refreshDoor - ' +
           service.controlService.subtype +
           ' updating characteristics to : ' +
-          this.getStateString(newValue)
+          this.gogogateAPI.getStateString(newValue)
       );
 
       service.controlService
@@ -508,40 +334,6 @@ Gogogate2Platform.prototype = {
     }
   },
 
-  refreshSensor: function(service, callback, type) {
-    var that = this;
-
-    let infoURL =
-      'http://' +
-      this.gogogateIP +
-      '/isg/temperature.php?door=' +
-      service.controlService.id;
-
-    request(infoURL, function optionalCallback(
-      statuserror,
-      statusresponse,
-      statusbody
-    ) {
-      if (statuserror) {
-        that.log('ERROR - refreshSensor -  failed');
-        that.handleError(statuserror);
-        if (callback) callback(undefined, undefined);
-      } else if (!IsJsonString(statusbody)) {
-        that.log('ERROR - refreshSensor -  failed');
-        that.log(
-          'ERROR - refreshSensor -  no JSON body : ' +
-            statusbody +
-            '-' +
-            statusresponse
-        );
-        that.handleError(statusbody);
-        if (callback) callback(undefined, undefined);
-      } else {
-        that.handleRefreshSensor(service, statusbody, callback, type);
-      }
-    });
-  },
-
   handleRefreshSensor(service, statusbody, callback, type) {
     this.log.debug('INFO - refreshSensor with body  : ' + statusbody);
 
@@ -550,7 +342,7 @@ Gogogate2Platform.prototype = {
     let newVal;
     let charToUpdate = undefined;
     if (type == BATTERY_SENSOR) {
-      newVal = normalizeBattery(res[1]);
+      newVal = GogogateTools.normalizeBattery(res[1]);
       charToUpdate = Characteristic.BatteryLevel;
       this.log.debug('INFO - refreshBattery with value  : ' + newVal);
     } else {
@@ -566,39 +358,6 @@ Gogogate2Platform.prototype = {
         .getCharacteristic(charToUpdate)
         .updateValue(newVal);
     }
-  },
-
-  activateDoor: function(controlService, callback) {
-    let commandURL =
-      'http://' +
-      this.gogogateIP +
-      '/isg/opendoor.php?numdoor=' +
-      controlService.id;
-
-    var that = this;
-
-    request(commandURL, function optionalCallback(
-      statuserror,
-      statusresponse,
-      statusbody
-    ) {
-      if (statuserror) {
-        that.log(
-          'ERROR - activateDoor - ERROR while sending command -' +
-            statusresponse +
-            '-' +
-            statusbody
-        );
-        that.handleError(statuserror);
-
-        callback(true);
-      } else {
-        that.log.debug(
-          'INFO - activateDoor - Command sent to ' + controlService.subtype
-        );
-        callback(false);
-      }
-    });
   },
 
   getCurrentDoorStateCharacteristic: function(
@@ -633,7 +392,7 @@ Gogogate2Platform.prototype = {
           ' - Real state through REFRESHDOOR'
       );
 
-      homebridgeAccessory.platform.refreshDoor(
+      homebridgeAccessory.platform.gogogateAPI.refreshDoor(
         homebridgeAccessory,
         service,
         callback
@@ -651,7 +410,7 @@ Gogogate2Platform.prototype = {
         'INFO - GET Characteristic.TargetDoorState - ' +
           service.controlService.subtype +
           ' - callback with state : ' +
-          this.getStateString(service.TargetDoorState)
+          this.gogogateAPI.getStateString(service.TargetDoorState)
       );
 
       callback(undefined, service.TargetDoorState);
@@ -662,7 +421,7 @@ Gogogate2Platform.prototype = {
           ' - Real state through REFRESHDOOR'
       );
 
-      homebridgeAccessory.platform.refreshDoor(
+      homebridgeAccessory.platform.gogogateAPI.refreshDoor(
         homebridgeAccessory,
         service,
         callback
@@ -692,10 +451,10 @@ Gogogate2Platform.prototype = {
         'INFO - SET Characteristic.TargetDoorState - ' +
           service.controlService.subtype +
           ' - CurrentDoorState is ' +
-          this.getStateString(currentState)
+          this.gogogateAPI.getStateString(currentState)
       );
 
-      homebridgeAccessory.platform.activateDoor(
+      homebridgeAccessory.platform.gogogateAPI.activateDoor(
         service.controlService,
         function(error) {
           if (error) {
@@ -796,7 +555,11 @@ Gogogate2Platform.prototype = {
     characteristic.on(
       'get',
       function(callback) {
-        homebridgeAccessory.platform.refreshSensor(service, callback, type);
+        homebridgeAccessory.platform.gogogateAPI.refreshSensor(
+          service,
+          callback,
+          type
+        );
       }.bind(this)
     );
   },
@@ -852,7 +615,7 @@ Gogogate2Platform.prototype = {
           characteristic,
           service,
           homebridgeAccessory,
-          TEMP_SENSOR
+          GogogateConst.TEMP_SENSOR
         );
         break;
       case characteristic instanceof Characteristic.BatteryLevel:
@@ -860,7 +623,7 @@ Gogogate2Platform.prototype = {
           characteristic,
           service,
           homebridgeAccessory,
-          BATTERY_SENSOR
+          GogogateConst.BATTERY_SENSOR
         );
         break;
       case characteristic instanceof Characteristic.ChargingState:
@@ -972,37 +735,3 @@ Gogogate2Platform.prototype = {
     return services;
   },
 };
-
-function Gogogate2Accessory(services) {
-  this.services = services;
-}
-
-function IsJsonString(str) {
-  try {
-    JSON.parse(str);
-  } catch (e) {
-    return false;
-  }
-  return true;
-}
-
-function checkTimer(timer) {
-  if (timer && timer > 0 && (timer < 30 || timer > 600)) return 180;
-  else return timer;
-}
-
-function checkParemeter(parameter, min, max, def) {
-  if (parameter == undefined || (parameter < min || parameter > max))
-    return def;
-  else return parameter;
-}
-
-function normalizeBattery(val) {
-  if (val == 'full') {
-    return 100;
-  } else if (val == 'low') {
-    return 0;
-  } else {
-    return val;
-  }
-}
