@@ -4,6 +4,7 @@
 [![npm](https://img.shields.io/npm/dw/homebridge-gogogate2.svg)](https://www.npmjs.com/package/homebridge-gogogate2)
 [![npm](https://img.shields.io/npm/dt/homebridge-gogogate2.svg)](https://www.npmjs.com/package/homebridge-gogogate2)
 
+[![CodeFactor](https://www.codefactor.io/repository/github/nicoduj/homebridge-gogogate2/badge)](https://www.codefactor.io/repository/github/nicoduj/homebridge-gogogate2)
 [![Build Status](https://travis-ci.com/nicoduj/homebridge-gogogate2.svg?branch=master)](https://travis-ci.com/nicoduj/homebridge-gogogate2)
 [![Known Vulnerabilities](https://snyk.io/test/github/nicoduj/homebridge-gogogate2/badge.svg?targetFile=package.json)](https://snyk.io/test/github/nicoduj/homebridge-gogogate2?targetFile=package.json)
 [![Greenkeeper badge](https://badges.greenkeeper.io/nicoduj/homebridge-gogogate2.svg)](https://greenkeeper.io/)
@@ -54,6 +55,8 @@ Fields:
 
 ## Changelog
 
+- 0.1.4
+  - [NEW] huge refactoring to enhance code quality (I hope there won't be too much bugs ! )
 - 0.1.3
   - [FIX] handle json parse error for sensor #14, new attempt (one more) !
 - 0.1.2
