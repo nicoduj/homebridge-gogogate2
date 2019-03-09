@@ -248,7 +248,7 @@ Gogogate2Platform.prototype = {
     }
 
     if (newValue == undefined) {
-      that.log.debug(
+      this.log.debug(
         'INFO - refreshDoor - ' +
           service.controlService.subtype +
           ' No new value'
