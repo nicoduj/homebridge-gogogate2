@@ -26,8 +26,9 @@ function Gogogate2Platform(log, config, api) {
     config['maxWaitTimeForOperation'],
     30,
     90,
-    30
+    45
   );
+
   this.foundAccessories = [];
 
   this.doors = [];
@@ -229,7 +230,7 @@ Gogogate2Platform.prototype = {
       service.TargetDoorState == currentDoorState
     ) {
       this.endDoorOperation(myGogogateAccessory, service);
-      let newValue = currentDoorState;
+      newValue = currentDoorState;
       this.log.debug(
         'WARNING - refreshDoor - ' +
           service.controlService.subtype +
