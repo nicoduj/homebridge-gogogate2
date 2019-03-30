@@ -1,6 +1,6 @@
 {
   "name": "homebridge-gogogate2",
-  "version": "0.1.5",
+  "version": "1.0.0-beta1",
   "author": "Nicolas Dujardin",
   "description": "Publish your gogogate 2 to homebridge",
   "main": "index.js",
