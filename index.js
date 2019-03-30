@@ -24,7 +24,7 @@ module.exports = function(homebridge) {
 
 function Gogogate2Platform(log, config, api) {
   if (!config) {
-    log('No configuration found for homebridge-harmonyHub');
+    log('No configuration found for homebridge-gogogate2');
     return;
   }
 
