@@ -10,15 +10,35 @@
 [![Greenkeeper badge](https://badges.greenkeeper.io/nicoduj/homebridge-gogogate2.svg)](https://greenkeeper.io/)
 [![code style: prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg?style=flat-square)](https://github.com/prettier/prettier)
 
+[![Support via PayPal][paypal-button]][paypal-nicoduj]
+
 [Gogogate 2](https://www.gogogate.com) plugin for [HomeBridge](https://github.com/nfarina/homebridge) using http calls.
 
 This plugin will add your doors connected to gogogate to homekit. It can update in the background so that openning / closing outside home app can trigger your automations. It will also display battery sensor and temperature from your wireless sensors.
 
-> List of known issues:
+> ---
+>
+> ## List of known issues:
 >
 > - Updating /refreshing might not be always reliable
 > - In case of network loss, not sur it will reconnect
 > - platform is not dynamic, so I brake at startup if gogogate is not reachable / can't give the doors. Can be improved.
+>
+> ---
+
+> ---
+>
+> ## Work In Progress For Dynamic Plugin Mode
+>
+> - This plugin is not a dynamic platform : hub configured MUST be available at homebridge startup, however it will crash homebridge start process. Work in Progress on this, but be warned and thus think of having a separate homebridge instance for it
+>
+> If you want to try Dynamic Platform mode I have published a beta version. It should not be visible in homebridge-config-ui-x update pannel, so you have to install it through terminal if you want :
+>
+> ```bash
+> npm install -g homebridge-gogogate2@beta
+> ```
+>
+> ---
 
 ## Installation
 
