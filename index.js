@@ -23,6 +23,11 @@ module.exports = function(homebridge) {
 };
 
 function Gogogate2Platform(log, config, api) {
+  if (!config) {
+    log('No configuration found for homebridge-harmonyHub');
+    return;
+  }
+
   this.log = log;
   this.gogogateIP = config['gogogateIP'];
   this.name = config['name'];
@@ -124,6 +129,8 @@ Gogogate2Platform.prototype = {
         this.gogogateAPI.getDoors(successDoors => {
           if (successDoors) {
             this.handleDoorsDiscovery();
+
+            this.refreshAllDoors();
             //timer for background refresh
             this.refreshBackground();
           }
@@ -279,23 +286,19 @@ Gogogate2Platform.prototype = {
     for (let a = 0; a < this.foundAccessories.length; a++) {
       let myGogogateAccessory = this.foundAccessories[a];
 
-      this.log.debug(
-        'INFO - refreshing Accessory : ' + myGogogateAccessory.displayName
-      );
       for (let s = 0; s < myGogogateAccessory.services.length; s++) {
         let service = myGogogateAccessory.services[s];
-
-        if (service instanceof Service.GarageDoorOpener) {
+        if (service.UUID == Service.GarageDoorOpener.UUID) {
           this.log.debug('INFO - refreshAllDoors - Door : ' + service.subtype);
           this.gogogateAPI.refreshDoor(myGogogateAccessory, service);
-        } else if (service instanceof Service.TemperatureSensor) {
+        } else if (service.UUID == Service.TemperatureSensor.UUID) {
           this.log.debug('INFO - refreshAllDoors - Temp : ' + service.subtype);
           this.gogogateAPI.refreshSensor(
             service,
             null,
             GogogateConst.TEMP_SENSOR
           );
-        } else if (service instanceof Service.BatteryService) {
+        } else if (service.UUID == Service.BatteryService.UUID) {
           this.log.debug(
             'INFO - refreshAllDoors - Battery : ' + service.subtype
           );
