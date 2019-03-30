@@ -37,7 +37,7 @@ This plugin will add your doors connected to gogogate to homekit. It can update 
     "username": "",
     "password": "",
     "refreshTimer": "120",
-    "maxWaitTimeForOperation": "30s",
+    "maxWaitTimeForOperation": "30",
     "refreshTimerDuringOperartion": "5"
   }
 ]
