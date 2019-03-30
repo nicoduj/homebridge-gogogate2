@@ -186,7 +186,7 @@ GogogateAPI.prototype = {
       'http://' +
       this.gogogateIP +
       '/isg/statusDoor.php?numdoor=' +
-      service.controlService.id;
+      service.gateId;
 
     request(infoURL, function optionalCallback(
       statuserror,
@@ -203,7 +203,7 @@ GogogateAPI.prototype = {
       if (statuserror) {
         that.log(
           'ERROR - refreshDoor - Refreshing status for ' +
-            service.controlService.subtype +
+            service.subtype +
             ' Door failed - ' +
             statusresponse
         );
@@ -228,7 +228,7 @@ GogogateAPI.prototype = {
       'http://' +
       this.gogogateIP +
       '/isg/temperature.php?door=' +
-      service.controlService.id;
+      service.gateId;
 
     request(infoURL, function optionalCallback(
       statuserror,
@@ -255,12 +255,12 @@ GogogateAPI.prototype = {
     });
   },
 
-  activateDoor: function(controlService, callback) {
+  activateDoor: function(service, callback) {
     let commandURL =
       'http://' +
       this.gogogateIP +
       '/isg/opendoor.php?numdoor=' +
-      controlService.id;
+      service.gateId;
 
     var that = this;
 
@@ -281,7 +281,7 @@ GogogateAPI.prototype = {
         callback(true);
       } else {
         that.log.debug(
-          'INFO - activateDoor - Command sent to ' + controlService.subtype
+          'INFO - activateDoor - Command sent to ' + service.subtype
         );
         callback(false);
       }
