@@ -260,6 +260,29 @@ Gogogate2Platform.prototype = {
     return newValue;
   },
 
+  endOperation(service, statusbody) {
+    this.log.debug(
+      'INFO - statusbody : *' +
+        statusbody +
+        '* - not OK : ' +
+        (statusbody != 'OK') +
+        ' - not FAIL : ' +
+        (statusbody != 'FAIL')
+    );
+
+    if (statusbody != 'OK' && statusbody != 'FAIL') return true;
+    //timeout
+    let elapsedTime = Date.now() - service.TargetDoorStateOperationStart;
+    if (
+      service.TargetDoorState !== undefined &&
+      elapsedTime > this.maxWaitTimeForOperation * 1000
+    ) {
+      return true;
+    }
+
+    return false;
+  },
+
   handleRefreshDoor(statusbody, myGogogateAccessory, service, callback) {
     this.log.debug(
       'INFO - refreshDoor - Got Status for : ' +
@@ -270,19 +293,13 @@ Gogogate2Platform.prototype = {
         this.gogogateAPI.getStateString(service.TargetDoorState)
     );
 
-    //timeout
-    let elapsedTime = Date.now() - service.TargetDoorStateOperationStart;
-
-    if (
-      service.TargetDoorState !== undefined &&
-      elapsedTime > this.maxWaitTimeForOperation * 1000
-    ) {
+    if (this.endOperation(service, statusbody)) {
       //operation has timedout
       this.endDoorOperation(myGogogateAccessory, service);
       this.log.debug(
         'WARNING - refreshDoor - ' +
           service.controlService.subtype +
-          ' - operation was in progress and  has timedout'
+          ' - operation was in progress and  has timedout or no status retrieval'
       );
     }
 

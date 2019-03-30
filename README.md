@@ -56,6 +56,8 @@ Fields:
 
 ## Changelog
 
+- 0.1.5
+  - [FIX] trying to work on #20 issue
 - 0.1.4
   - [NEW] huge refactoring to enhance code quality (I hope there won't be too much bugs ! )
 - 0.1.3

@@ -21,7 +21,7 @@ function isLoginError(statuserror) {
       statuserror.code &&
       statuserror.code.includes('ECONNREFUSED')) ||
     (statuserror &&
-      statuserror instanceof String &&
+      (typeof statuserror === 'string' || statuserror instanceof String) &&
       statuserror.includes('Restricted Access'))
   );
 }
@@ -193,6 +193,13 @@ GogogateAPI.prototype = {
       statusresponse,
       statusbody
     ) {
+      that.log.debug(
+        'INFO - statusbody : *' +
+          statusbody +
+          '* - statusresponse : ' +
+          JSON.stringify(statusresponse)
+      );
+
       if (statuserror) {
         that.log(
           'ERROR - refreshDoor - Refreshing status for ' +
