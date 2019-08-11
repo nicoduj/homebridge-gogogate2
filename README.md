@@ -16,20 +16,6 @@
 
 This plugin will add your doors connected to gogogate to homekit. It can update in the background so that openning / closing outside home app can trigger your automations. It will also display battery sensor and temperature from your wireless sensors.
 
-> ---
->
-> ## Work In Progress For Dynamic Plugin Mode
->
-> - This plugin is not a dynamic platform : hub configured MUST be available at homebridge startup, however it will crash homebridge start process. Work in Progress on this, but be warned and thus think of having a separate homebridge instance for it
->
-> If you want to try Dynamic Platform mode I have published a beta version. It should not be visible in homebridge-config-ui-x update pannel, so you have to install it through terminal if you want :
->
-> ```bash
-> npm install -g homebridge-gogogate2@beta
-> ```
->
-> ---
-
 ## Installation
 
 1. Install Homebridge using: `npm install -g homebridge`
