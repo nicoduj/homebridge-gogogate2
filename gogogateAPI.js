@@ -179,7 +179,12 @@ GogogateAPI.prototype = {
     });
   },
 
-  refreshDoor: function(myGogogateAccessory, service, callback) {
+  refreshDoor: function(
+    myGogogateAccessory,
+    service,
+    callback,
+    characteristic
+  ) {
     var that = this;
 
     let infoURL =
@@ -215,7 +220,8 @@ GogogateAPI.prototype = {
           statusbody,
           myGogogateAccessory,
           service,
-          callback
+          callback,
+          characteristic
         );
       }
     });

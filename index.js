@@ -327,9 +327,9 @@ Gogogate2Platform.prototype = {
       this.endDoorOperation(myGogogateAccessory, service);
       newValue = currentDoorState;
       this.log.debug(
-        'WARNING - refreshDoor - ' +
+        'INFO - refreshDoor - ' +
           service.subtype +
-          ' - OPENING operation was in progress and is achieved: ' +
+          ' - Operation was in progress and is achieved: ' +
           this.gogogateAPI.getStateString(newValue)
       );
     } else if (service.TargetDoorState == undefined) {
@@ -345,7 +345,14 @@ Gogogate2Platform.prototype = {
 
     if (newValue == undefined) {
       this.log.debug(
-        'INFO - refreshDoor - ' + service.subtype + ' No new value'
+        'INFO - refreshDoor - ' +
+          service.subtype +
+          ' No new value ' +
+          this.gogogateAPI.getStateString(currentDoorState) +
+          '/' +
+          this.gogogateAPI.getStateString(service.TargetDoorState) +
+          '/' +
+          this.gogogateAPI.getStateString(oldValue)
       );
       newValue = oldValue;
     }
@@ -354,29 +361,35 @@ Gogogate2Platform.prototype = {
   },
 
   endOperation(service, statusbody) {
-    this.log.debug(
-      'INFO - statusbody : *' +
-        statusbody +
-        '* - not OK : ' +
-        (statusbody != 'OK') +
-        ' - not FAIL : ' +
-        (statusbody != 'FAIL')
-    );
-
     if (statusbody != 'OK' && statusbody != 'FAIL') return true;
+
     //timeout
-    let elapsedTime = Date.now() - service.TargetDoorStateOperationStart;
     if (
       service.TargetDoorState !== undefined &&
-      elapsedTime > this.maxWaitTimeForOperation * 1000
+      service.TargetDoorStateOperationStart !== undefined
     ) {
-      return true;
+      let elapsedTime = Date.now() - service.TargetDoorStateOperationStart;
+      this.log.debug(
+        'INFO - CheckTimeout / statusbody : ' +
+          statusbody +
+          ' - elapsedTime : ' +
+          elapsedTime
+      );
+      if (elapsedTime > this.maxWaitTimeForOperation * 1000) {
+        return true;
+      }
     }
 
     return false;
   },
 
-  handleRefreshDoor(statusbody, myGogogateAccessory, service, callback) {
+  handleRefreshDoor(
+    statusbody,
+    myGogogateAccessory,
+    service,
+    callback,
+    characteristic
+  ) {
     this.log.debug(
       'INFO - refreshDoor - Got Status for : ' +
         service.subtype +
@@ -389,10 +402,10 @@ Gogogate2Platform.prototype = {
     if (this.endOperation(service, statusbody)) {
       //operation has timedout
       this.endDoorOperation(myGogogateAccessory, service);
-      this.log.debug(
+      this.log(
         'WARNING - refreshDoor - ' +
           service.subtype +
-          ' - operation was in progress and  has timedout or no status retrieval'
+          ' - operation was in progress and has timedout or no status retrieval'
       );
     }
 
@@ -414,13 +427,23 @@ Gogogate2Platform.prototype = {
     );
 
     if (callback) {
-      this.log.debug(
-        'INFO - refreshDoor - ' +
-          service.subtype +
-          ' calling callback with value : ' +
-          this.gogogateAPI.getStateString(newValue)
-      );
-      callback(undefined, newValue);
+      if (characteristic == Characteristic.CurrentDoorState) {
+        this.log.debug(
+          'INFO - refreshDoor - ' +
+            service.subtype +
+            ' calling callback on CurrentDoorState with value : ' +
+            this.gogogateAPI.getStateString(newValue)
+        );
+        callback(undefined, newValue);
+      } else if (characteristic == Characteristic.TargetDoorState) {
+        this.log.debug(
+          'INFO - refreshDoor - ' +
+            service.subtype +
+            ' calling callback on TargetDoorState with value : ' +
+            this.gogogateAPI.getStateString(service.TargetDoorState)
+        );
+        callback(undefined, service.TargetDoorState);
+      }
     } else if (newValue != oldValue) {
       this.log.debug(
         'INFO - refreshDoor - ' +
@@ -429,18 +452,14 @@ Gogogate2Platform.prototype = {
           this.gogogateAPI.getStateString(newValue)
       );
 
+      //TargetDoorState before CurrentDoorState
+      service
+        .getCharacteristic(Characteristic.TargetDoorState)
+        .updateValue(newValue);
+
       service
         .getCharacteristic(Characteristic.CurrentDoorState)
         .updateValue(newValue);
-
-      if (
-        newValue == Characteristic.CurrentDoorState.OPEN ||
-        newValue == Characteristic.CurrentDoorState.CLOSED
-      ) {
-        service
-          .getCharacteristic(Characteristic.TargetDoorState)
-          .updateValue(newValue);
-      }
     }
   },
 
@@ -503,7 +522,8 @@ Gogogate2Platform.prototype = {
       homebridgeAccessory.platform.gogogateAPI.refreshDoor(
         homebridgeAccessory,
         service,
-        callback
+        callback,
+        Characteristic.CurrentDoorState
       );
     }
   },
@@ -532,7 +552,8 @@ Gogogate2Platform.prototype = {
       homebridgeAccessory.platform.gogogateAPI.refreshDoor(
         homebridgeAccessory,
         service,
-        callback
+        callback,
+        Characteristic.TargetDoorState
       );
     }
   },
@@ -726,9 +747,7 @@ Gogogate2Platform.prototype = {
   endDoorOperation(myGogogateAccessory, service) {
     //stop timer for this operation
     this.log.debug(
-      'INFO - endDoorOperation - ' +
-        service.subtype +
-        ' - Stopping operation Timer'
+      'INFO - endDoorOperation - ' + service.subtype + ' - Stopping operation'
     );
 
     service.TargetDoorState = undefined;
@@ -750,6 +769,7 @@ Gogogate2Platform.prototype = {
       }
 
       if (!operationInProgress) {
+        this.log.debug('Stopping Operation Timer ');
         clearInterval(this.timerID);
         this.timerID = undefined;
         this.refreshBackground();

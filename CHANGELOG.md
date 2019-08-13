@@ -2,7 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.0.1
+
+- [FIX] #13 : door can switch to closing while opening
+
 ## 1.0.0
+
 - [FIX] #4 : switch to dynamic platform mode
 
 ## 0.1.5
