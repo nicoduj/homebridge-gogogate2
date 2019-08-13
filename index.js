@@ -474,7 +474,7 @@ Gogogate2Platform.prototype = {
     callback
   ) {
     if (
-      service.TargetDoorState &&
+      service.TargetDoorState !== undefined &&
       service.TargetDoorState == Characteristic.TargetDoorState.OPEN
     ) {
       this.log.debug(
@@ -484,7 +484,7 @@ Gogogate2Platform.prototype = {
       );
       callback(undefined, Characteristic.CurrentDoorState.OPENING);
     } else if (
-      service.TargetDoorState &&
+      service.TargetDoorState !== undefined &&
       service.TargetDoorState == Characteristic.TargetDoorState.CLOSED
     ) {
       this.log.debug(
@@ -513,7 +513,7 @@ Gogogate2Platform.prototype = {
     service,
     callback
   ) {
-    if (service.TargetDoorState) {
+    if (service.TargetDoorState !== undefined) {
       this.log.debug(
         'INFO - GET Characteristic.TargetDoorState - ' +
           service.subtype +
@@ -743,7 +743,7 @@ Gogogate2Platform.prototype = {
       let operationInProgress = false;
       for (let s = 0; s < myGogogateAccessory.services.length; s++) {
         let service = myGogogateAccessory.services[s];
-        if (service.TargetDoorStateOperationStart) {
+        if (service.TargetDoorStateOperationStart !== undefined) {
           operationInProgress = true;
           break;
         }
