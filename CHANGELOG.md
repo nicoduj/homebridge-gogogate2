@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.0.0
+- [FIX] #4 : switch to dynamic platform mode
+
 ## 0.1.5
 
 - [FIX] trying to work on #20 issue
