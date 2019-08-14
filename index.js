@@ -411,11 +411,11 @@ Gogogate2Platform.prototype = {
             this.gogogateAPI.getStateString(newTargetState)
         );
         //TargetDoorState before CurrentDoorState
-        setTimeout(function() {
+        setImmediate(() => {
           service
             .getCharacteristic(Characteristic.TargetDoorState)
             .updateValue(newTargetState);
-        }, 200);
+        };
       }
 
       if (newDoorState != oldDoorState) {
@@ -425,11 +425,11 @@ Gogogate2Platform.prototype = {
             ' updating CurrentDoorState to : ' +
             this.gogogateAPI.getStateString(newDoorState)
         );
-        setTimeout(function() {
+        setImmediate(() => {
           service
             .getCharacteristic(Characteristic.CurrentDoorState)
             .updateValue(newDoorState);
-        }, 200);
+        });
 
       }
 
@@ -457,11 +457,11 @@ Gogogate2Platform.prototype = {
       callback(undefined, newVal);
     } else {
 
-      setTimeout(function() {
+      setImmediate(() => {
         service
           .getCharacteristic(charToUpdate)
           .updateValue(newVal);
-      }, 200);
+      });
     }
   },
 
@@ -552,14 +552,14 @@ Gogogate2Platform.prototype = {
       ) {
         if (error) {
           that.endDoorOperation(homebridgeAccessory, service);
-          setTimeout(function() {
+          setImmediate(() => {
             service
               .getCharacteristic(Characteristic.TargetDoorState)
               .updateValue(currentValue);
             service
               .getCharacteristic(Characteristic.CurrentDoorState)
               .updateValue(currentState);
-          }, 200);
+          });
           that.log.debug(
             'ERROR - SET Characteristic.TargetDoorState - ' +
               service.subtype +
