@@ -312,7 +312,6 @@ Gogogate2Platform.prototype = {
     }
   },
 
-
   endOperation(service, statusbody) {
     if (statusbody != 'OK' && statusbody != 'FAIL') return true;
 
@@ -343,31 +342,46 @@ Gogogate2Platform.prototype = {
     callback,
     characteristic
   ) {
-
-
-    let currentDoorState = (statusbody == 'OK' ? Characteristic.CurrentDoorState.OPEN : Characteristic.CurrentDoorState.CLOSED);
-    let operationInProgress = (service.TargetDoorStateOperationStart !== undefined);
-    let operationInProgressIsFinished = (operationInProgress && service.TargetDoorState == currentDoorState);
-    let oldDoorState = service.getCharacteristic(Characteristic.CurrentDoorState).value;
-    let oldTargetState = service.getCharacteristic(Characteristic.TargetDoorState).value;
+    let currentDoorState =
+      statusbody == 'OK'
+        ? Characteristic.CurrentDoorState.OPEN
+        : Characteristic.CurrentDoorState.CLOSED;
+    let operationInProgress =
+      service.TargetDoorStateOperationStart !== undefined;
+    let operationInProgressIsFinished =
+      operationInProgress && service.TargetDoorState == currentDoorState;
+    let oldDoorState = service.getCharacteristic(
+      Characteristic.CurrentDoorState
+    ).value;
+    let oldTargetState = service.getCharacteristic(
+      Characteristic.TargetDoorState
+    ).value;
 
     this.log.debug(
       'INFO - refreshDoor - Got Status for : ' +
         service.subtype +
         ' - (currentDoorState/operationInProgress/operationInProgressIsFinished/oldDoorState) : (' +
-        currentDoorState +'/' + operationInProgress + '/' + operationInProgressIsFinished + '/' + oldDoorState + ')'
+        currentDoorState +
+        '/' +
+        operationInProgress +
+        '/' +
+        operationInProgressIsFinished +
+        '/' +
+        oldDoorState +
+        ')'
     );
-    
+
     var newDoorState = oldDoorState;
     var newTargetState = oldTargetState;
 
     //operation has finished or timed out
 
-    if (operationInProgressIsFinished || this.endOperation(service, statusbody))
-    {
+    if (
+      operationInProgressIsFinished ||
+      this.endOperation(service, statusbody)
+    ) {
       this.endDoorOperation(myGogogateAccessory, service);
-      if (!operationInProgressIsFinished)
-      {
+      if (!operationInProgressIsFinished) {
         this.log(
           'WARNING - refreshDoor - ' +
             service.subtype +
@@ -376,9 +390,7 @@ Gogogate2Platform.prototype = {
       }
       newDoorState = currentDoorState;
       newTargetState = currentDoorState;
-    }
-    else if (!operationInProgress && currentDoorState != oldDoorState)
-    {
+    } else if (!operationInProgress && currentDoorState != oldDoorState) {
       newDoorState = currentDoorState;
       newTargetState = currentDoorState;
     }
@@ -401,8 +413,7 @@ Gogogate2Platform.prototype = {
         );
         callback(undefined, newTargetState);
       }
-    } else 
-    {
+    } else {
       if (newTargetState != oldTargetState) {
         this.log.debug(
           'INFO - refreshDoor - ' +
@@ -415,7 +426,7 @@ Gogogate2Platform.prototype = {
           service
             .getCharacteristic(Characteristic.TargetDoorState)
             .updateValue(newTargetState);
-        };
+        });
       }
 
       if (newDoorState != oldDoorState) {
@@ -430,10 +441,8 @@ Gogogate2Platform.prototype = {
             .getCharacteristic(Characteristic.CurrentDoorState)
             .updateValue(newDoorState);
         });
-
       }
-
-      }
+    }
   },
 
   handleRefreshSensor(service, statusbody, callback, type) {
@@ -456,11 +465,8 @@ Gogogate2Platform.prototype = {
     if (callback) {
       callback(undefined, newVal);
     } else {
-
       setImmediate(() => {
-        service
-          .getCharacteristic(charToUpdate)
-          .updateValue(newVal);
+        service.getCharacteristic(charToUpdate).updateValue(newVal);
       });
     }
   },
@@ -470,11 +476,12 @@ Gogogate2Platform.prototype = {
     service,
     callback
   ) {
-
     //operationInProgress, returns current state
-    if (service.TargetDoorStateOperationStart !== undefined)
-    {
-      callback(undefined,service.getCharacteristic(Characteristic.CurrentDoorState).value);
+    if (service.TargetDoorStateOperationStart !== undefined) {
+      callback(
+        undefined,
+        service.getCharacteristic(Characteristic.CurrentDoorState).value
+      );
     } else {
       this.log.debug(
         'INFO - GET Characteristic.CurrentDoorState - ' +
