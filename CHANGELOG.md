@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.0.2
+
+- [FIX] #31 Door might be stuck to opening or closing
+
 ## 1.0.1
 
 - [FIX] #13 : door can switch to closing while opening

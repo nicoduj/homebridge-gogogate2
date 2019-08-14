@@ -246,9 +246,8 @@ GogogateAPI.prototype = {
         that.handleError(statuserror);
         if (callback) callback(undefined, undefined);
       } else if (!GogogateTools.IsJsonString(statusbody)) {
-        that.log('ERROR - refreshSensor -  failed');
         that.log(
-          'ERROR - refreshSensor -  no JSON body : ' +
+          'ERROR - refreshSensor -  failed - no JSON body : ' +
             statusbody +
             '-' +
             statusresponse
