@@ -380,7 +380,7 @@ Gogogate2Platform.prototype = {
       operationInProgressIsFinished ||
       this.endOperation(service, statusbody)
     ) {
-      this.endDoorOperation(myGogogateAccessory, service);
+      this.endDoorOperation(service);
       if (!operationInProgressIsFinished) {
         this.log(
           'WARNING - refreshDoor - ' +
@@ -558,7 +558,7 @@ Gogogate2Platform.prototype = {
         error
       ) {
         if (error) {
-          that.endDoorOperation(homebridgeAccessory, service);
+          that.endDoorOperation(service);
           setImmediate(() => {
             service
               .getCharacteristic(Characteristic.TargetDoorState)
@@ -709,7 +709,7 @@ Gogogate2Platform.prototype = {
     }, this.refreshTimerDuringOperation * 1000);
   },
 
-  endDoorOperation(myGogogateAccessory, service) {
+  endDoorOperation(service) {
     //stop timer for this operation
     this.log.debug(
       'INFO - endDoorOperation - ' + service.subtype + ' - Stopping operation'
@@ -718,19 +718,24 @@ Gogogate2Platform.prototype = {
     service.TargetDoorState = undefined;
     service.TargetDoorStateOperationStart = undefined;
 
-    this.checkEndOperation(myGogogateAccessory);
+    this.checkEndOperation();
   },
 
-  checkEndOperation(myGogogateAccessory) {
+  checkEndOperation() {
     //clear timer and set background again if no other operation in progress
+
     if (this.timerID !== undefined) {
       let operationInProgress = false;
-      for (let s = 0; s < myGogogateAccessory.services.length; s++) {
-        let service = myGogogateAccessory.services[s];
-        if (service.TargetDoorStateOperationStart !== undefined) {
-          operationInProgress = true;
-          break;
+      for (let a = 0; a < this.foundAccessories.length; a++) {
+        let myGogogateAccessory = this.foundAccessories[a];
+        for (let s = 0; s < myGogogateAccessory.services.length; s++) {
+          let service = myGogogateAccessory.services[s];
+          if (service.TargetDoorStateOperationStart !== undefined) {
+            operationInProgress = true;
+            break;
+          }
         }
+        if (operationInProgress) break;
       }
 
       if (!operationInProgress) {

@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.0.3
+
+- [FIX] #32 Operation timer is canceled before all operations completed if more than one dorr is operated simultaneously
+
 ## 1.0.2
 
 - [FIX] #31 Door might be stuck to opening or closing
