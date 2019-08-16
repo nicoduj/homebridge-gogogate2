@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.0.4
+
+- [FIX] #33 Status is not correct until refresh timer if door operated outside app
+
 ## 1.0.3
 
 - [FIX] #32 Operation timer is canceled before all operations completed if more than one dorr is operated simultaneously

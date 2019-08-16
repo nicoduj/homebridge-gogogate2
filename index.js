@@ -290,7 +290,7 @@ Gogogate2Platform.prototype = {
         let service = myGogogateAccessory.services[s];
         if (service.UUID == Service.GarageDoorOpener.UUID) {
           this.log.debug('INFO - refreshAllDoors - Door : ' + service.subtype);
-          this.gogogateAPI.refreshDoor(myGogogateAccessory, service);
+          this.gogogateAPI.refreshDoor(service);
         } else if (service.UUID == Service.TemperatureSensor.UUID) {
           this.log.debug('INFO - refreshAllDoors - Temp : ' + service.subtype);
           this.gogogateAPI.refreshSensor(
@@ -335,13 +335,7 @@ Gogogate2Platform.prototype = {
     return false;
   },
 
-  handleRefreshDoor(
-    statusbody,
-    myGogogateAccessory,
-    service,
-    callback,
-    characteristic
-  ) {
+  handleRefreshDoor(statusbody, service, callback, characteristic) {
     let currentDoorState =
       statusbody == 'OK'
         ? Characteristic.CurrentDoorState.OPEN
@@ -404,6 +398,15 @@ Gogogate2Platform.prototype = {
             this.gogogateAPI.getStateString(newDoorState)
         );
         callback(undefined, newDoorState);
+
+        //No operation in progress, ensure that target state is in sync if status has changed.
+        if (!operationInProgress) {
+          setImmediate(() => {
+            service
+              .getCharacteristic(Characteristic.TargetDoorState)
+              .updateValue(newTargetState);
+          });
+        }
       } else if (characteristic == Characteristic.TargetDoorState) {
         this.log.debug(
           'INFO - refreshDoor - ' +
@@ -490,7 +493,6 @@ Gogogate2Platform.prototype = {
       );
 
       homebridgeAccessory.platform.gogogateAPI.refreshDoor(
-        homebridgeAccessory,
         service,
         callback,
         Characteristic.CurrentDoorState
@@ -520,7 +522,6 @@ Gogogate2Platform.prototype = {
       );
 
       homebridgeAccessory.platform.gogogateAPI.refreshDoor(
-        homebridgeAccessory,
         service,
         callback,
         Characteristic.TargetDoorState
