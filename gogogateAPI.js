@@ -205,7 +205,7 @@ GogogateAPI.prototype = {
           'ERROR - refreshDoor - Refreshing status for ' +
             service.subtype +
             ' Door failed - ' +
-            statusresponse
+            JSON.stringify(statusresponse)
         );
         that.handleError(statuserror);
 
@@ -241,10 +241,10 @@ GogogateAPI.prototype = {
         if (callback) callback(undefined, undefined);
       } else if (!GogogateTools.IsJsonString(statusbody)) {
         that.log(
-          'ERROR - refreshSensor -  failed - no JSON body : ' +
+          'ERROR - refreshSensor -  failed - no JSON body -' +
             statusbody +
             '-' +
-            statusresponse
+            JSON.stringify(statusresponse)
         );
         that.handleError(statusbody);
         if (callback) callback(undefined, undefined);
@@ -271,9 +271,9 @@ GogogateAPI.prototype = {
       if (statuserror) {
         that.log(
           'ERROR - activateDoor - ERROR while sending command -' +
-            statusresponse +
+            statusbody +
             '-' +
-            statusbody
+            JSON.stringify(statusresponse)
         );
         that.handleError(statuserror);
 

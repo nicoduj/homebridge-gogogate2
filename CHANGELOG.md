@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.0.5
+
+- [FIX] fixed some logs
+
 ## 1.0.4
 
 - [FIX] #33 Status is not correct until refresh timer if door operated outside app
