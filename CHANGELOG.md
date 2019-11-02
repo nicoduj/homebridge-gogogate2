@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.0.6
+
+- [NEW] Supports config UI X configuration interface.
+  
 ## 1.0.5
 
 - [FIX] fixed some logs
