@@ -1,5 +1,5 @@
 module.exports = {
-  IsJsonString: function(str) {
+  IsJsonString: function (str) {
     try {
       JSON.parse(str);
     } catch (e) {
@@ -8,18 +8,17 @@ module.exports = {
     return true;
   },
 
-  checkTimer: function(timer) {
+  checkTimer: function (timer) {
     if (timer && timer > 0 && (timer < 30 || timer > 600)) return 180;
     else return timer;
   },
 
-  checkParemeter: function(parameter, min, max, def) {
-    if (parameter == undefined || (parameter < min || parameter > max))
-      return def;
+  checkParemeter: function (parameter, min, max, def) {
+    if (parameter == undefined || parameter < min || parameter > max) return def;
     else return parameter;
   },
 
-  normalizeBattery: function(val) {
+  normalizeBattery: function (val) {
     if (val == 'full') {
       return 100;
     } else if (val == 'low') {
@@ -27,9 +26,5 @@ module.exports = {
     } else {
       return val;
     }
-  },
-
-  Gogogate2Accessory: function(services) {
-    this.services = services;
   },
 };
