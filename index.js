@@ -45,9 +45,6 @@ function Gogogate2Platform(log, config, api) {
   this.cleanCache = config['cleanCache'];
 
   this.foundAccessories = [];
-
-  this.doors = [];
-
   this.gogogateAPI = new GogogateAPI(log, this);
 
   if (api) {
@@ -78,7 +75,7 @@ function Gogogate2Platform(log, config, api) {
             );
             this.foundAccessories = [];
           }
-          this.configureAccessories();
+          this.discoverDoors();
         }.bind(this)
       );
   }
@@ -103,144 +100,159 @@ Gogogate2Platform.prototype = {
     this.gogogateAPI.logout(() => {});
   },
 
-  refreshBackground() {
-    //timer for background refresh
-    if (this.refreshTimer !== undefined && this.refreshTimer > 0) {
-      this.log.debug(
-        'INFO - Setting Timer for background refresh every  : ' + this.refreshTimer + 's'
-      );
-      this.timerID = setInterval(() => this.refreshAllDoors(), this.refreshTimer * 1000);
-    }
-  },
-
-  configureAccessories: function () {
-    this.gogogateAPI.login((success) => {
-      if (success) {
-        this.gogogateAPI.getDoors((successDoors) => {
-          if (successDoors) {
-            this.handleDoorsDiscovery();
-
-            this.refreshAllDoors();
-            //timer for background refresh
-            this.refreshBackground();
-          }
-        });
+  discoverDoors: function () {
+    this.gogogateAPI.on('doorsRetrieveError', () => {
+      if (this.timerID == undefined) {
+        this.log('ERROR - discoverDoors - will retry in 1 minute');
+        setTimeout(() => {
+          this.gogogateAPI.getDoors();
+        }, 60000);
       }
     });
+
+    this.gogogateAPI.on('doorsRetrieved', () => {
+      this.log.debug('INFO - doorsRetrieved event');
+      this.loadDoors();
+    });
+
+    this.gogogateAPI.on('doorRefreshError', (gateId) => {
+      this.log.debug('INFO - doorRefreshError event -' + gateId);
+      if (this.timerID == undefined) {
+        this.log('ERROR - doorRefreshError - will retry in 1 minute');
+        setTimeout(() => {
+          this.gogogateAPI.refreshDoor(gateId);
+        }, 60000);
+      }
+    });
+
+    this.gogogateAPI.on('doorRefreshed', (gateId, result) => {
+      this.log.debug('INFO - doorRefreshed event -' + gateId + '-' + result);
+      this.handleRefreshDoor(result, gateId);
+    });
+
+    this.gogogateAPI.on('sensorRefreshError', (gateId) => {
+      this.log.debug('INFO - sensorRefreshError event -' + gateId);
+      if (this.timerID == undefined) {
+        this.log('ERROR - sensorRefreshError - will retry in 1 minute');
+        setTimeout(() => {
+          this.gogogateAPI.refreshSensor(gateId);
+        }, 60000);
+      }
+    });
+
+    this.gogogateAPI.on('sensorRefreshed', (gateId, result) => {
+      this.log.debug('INFO - sensorRefreshed event -' + gateId + '-' + result);
+      this.handleRefreshSensor(result, gateId);
+    });
+
+    this.gogogateAPI.getDoors();
   },
 
-  handleDoorsDiscovery() {
-    for (let i = 0, len = this.doors.length; i < len; i++) {
-      let doorName = this.doors[i];
+  loadDoors() {
+    let doors = this.gogogateAPI.discoverdDoors;
+    let sensors = this.gogogateAPI.discoverdSensors;
 
-      if (doorName && !doorName.isEmpty()) {
-        if (this.devMode) {
-          doorName = 'DEV' + doorName;
-        }
-        this.log('INFO - Discovered door : ' + doorName);
+    if (doors && doors instanceof Array && doors.length > 0) {
+      for (let i = 0, len = doors.length; i < len; i++) {
+        let doorName = doors[i];
 
-        let uuid = UUIDGen.generate(doorName);
-        let myGogogateDoorAccessory = this.foundAccessories.find((x) => x.UUID == uuid);
+        if (doorName && !doorName.isEmpty()) {
+          if (this.devMode) {
+            doorName = 'DEV' + doorName;
+          }
+          this.log('INFO - Discovered door : ' + doorName);
 
-        if (!myGogogateDoorAccessory) {
-          myGogogateDoorAccessory = new Accessory(doorName, uuid);
+          let uuid = UUIDGen.generate(doorName);
+          let myGogogateDoorAccessory = this.foundAccessories.find((x) => x.UUID == uuid);
+
+          if (!myGogogateDoorAccessory) {
+            myGogogateDoorAccessory = new Accessory(doorName, uuid);
+            myGogogateDoorAccessory.name = doorName;
+            myGogogateDoorAccessory.model = 'Gogogate2';
+            myGogogateDoorAccessory.manufacturer = 'Gogogate';
+            myGogogateDoorAccessory.serialNumber = doorName + '-' + this.gogogateIP;
+
+            myGogogateDoorAccessory
+              .getService(Service.AccessoryInformation)
+              .setCharacteristic(Characteristic.Manufacturer, myGogogateDoorAccessory.manufacturer)
+              .setCharacteristic(Characteristic.Model, myGogogateDoorAccessory.model)
+              .setCharacteristic(Characteristic.SerialNumber, myGogogateDoorAccessory.serialNumber);
+            this.api.registerPlatformAccessories('homebridge-gogogate2', 'GogoGate2', [
+              myGogogateDoorAccessory,
+            ]);
+            this.foundAccessories.push(myGogogateDoorAccessory);
+          }
+
+          myGogogateDoorAccessory.gateId = i + 1;
           myGogogateDoorAccessory.name = doorName;
-          myGogogateDoorAccessory.model = 'Gogogate2';
-          myGogogateDoorAccessory.manufacturer = 'Gogogate';
-          myGogogateDoorAccessory.serialNumber = doorName + '-' + this.gogogateIP;
 
-          myGogogateDoorAccessory
-            .getService(Service.AccessoryInformation)
-            .setCharacteristic(Characteristic.Manufacturer, myGogogateDoorAccessory.manufacturer)
-            .setCharacteristic(Characteristic.Model, myGogogateDoorAccessory.model)
-            .setCharacteristic(Characteristic.SerialNumber, myGogogateDoorAccessory.serialNumber);
-          this.api.registerPlatformAccessories('homebridge-gogogate2', 'GogoGate2', [
-            myGogogateDoorAccessory,
-          ]);
-          this.foundAccessories.push(myGogogateDoorAccessory);
-        }
-
-        myGogogateDoorAccessory.platform = this;
-
-        let HKService = myGogogateDoorAccessory.getServiceByUUIDAndSubType(
-          doorName,
-          'GarageDoorOpener' + doorName
-        );
-
-        if (!HKService) {
-          this.log('INFO - Creating Main Service ' + doorName);
-          HKService = new Service.GarageDoorOpener(doorName, 'GarageDoorOpener' + doorName);
-          HKService.subtype = 'GarageDoorOpener' + doorName;
-          myGogogateDoorAccessory.addService(HKService);
-        }
-
-        HKService.gateId = i + 1;
-
-        this.bindCurrentDoorStateCharacteristic(HKService, myGogogateDoorAccessory);
-        this.bindTargetDoorStateCharacteristic(HKService, myGogogateDoorAccessory);
-        this.bindObstructionDetectedCharacteristic(HKService, myGogogateDoorAccessory);
-
-        if (this.sensors[i] && !this.sensors[i].isEmpty()) {
-          this.log('INFO - Discovered sensor : ' + this.sensors[i]);
-
-          let HKService1 = myGogogateDoorAccessory.getServiceByUUIDAndSubType(
+          let HKService = myGogogateDoorAccessory.getServiceByUUIDAndSubType(
             doorName,
-            'BatteryService' + this.sensors[i]
+            'GarageDoorOpener' + doorName
           );
 
-          if (!HKService1) {
-            this.log(
-              'INFO - Creating  Service ' + doorName + '/' + 'BatteryService' + this.sensors[i]
+          if (!HKService) {
+            this.log('INFO - Creating Main Service ' + doorName);
+            HKService = new Service.GarageDoorOpener(doorName, 'GarageDoorOpener' + doorName);
+            HKService.subtype = 'GarageDoorOpener' + doorName;
+            myGogogateDoorAccessory.addService(HKService);
+          }
+
+          HKService.gateId = i + 1;
+
+          this.bindCurrentDoorStateCharacteristic(HKService, myGogogateDoorAccessory);
+          this.bindTargetDoorStateCharacteristic(HKService, myGogogateDoorAccessory);
+          this.bindObstructionDetectedCharacteristic(HKService, myGogogateDoorAccessory);
+
+          if (sensors[i] && !sensors[i].isEmpty()) {
+            this.log('INFO - Discovered sensor : ' + sensors[i]);
+
+            let HKService1 = myGogogateDoorAccessory.getServiceByUUIDAndSubType(
+              doorName,
+              'BatteryService' + sensors[i]
             );
-            HKService1 = new Service.BatteryService(doorName, 'BatteryService' + this.sensors[i]);
-            HKService1.subtype = 'BatteryService' + this.sensors[i];
-            myGogogateDoorAccessory.addService(HKService1);
+
+            if (!HKService1) {
+              this.log(
+                'INFO - Creating  Service ' + doorName + '/' + 'BatteryService' + sensors[i]
+              );
+              HKService1 = new Service.BatteryService(doorName, 'BatteryService' + sensors[i]);
+              HKService1.subtype = 'BatteryService' + sensors[i];
+              myGogogateDoorAccessory.addService(HKService1);
+            }
+            HKService1.gateId = i + 1;
+
+            this.bindBatteryLevelCharacteristic(HKService1, myGogogateDoorAccessory);
+            this.bindChargingStateCharacteristic(HKService1);
+            this.bindStatusLowBatteryCharacteristic(HKService1);
+
+            let HKService2 = myGogogateDoorAccessory.getServiceByUUIDAndSubType(
+              doorName,
+              'Temp' + sensors[i]
+            );
+
+            if (!HKService2) {
+              this.log('INFO - Creating  Service ' + doorName + '/' + 'Temp' + sensors[i]);
+              HKService2 = new Service.TemperatureSensor(doorName, 'Temp' + sensors[i]);
+              HKService2.subtype = 'Temp' + sensors[i];
+              myGogogateDoorAccessory.addService(HKService2);
+            }
+
+            HKService2.gateId = i + 1;
+
+            this.bindCurrentTemperatureLevelCharacteristic(HKService2, myGogogateDoorAccessory);
           }
-          HKService1.gateId = i + 1;
-
-          this.bindBatteryLevelCharacteristic(HKService1, myGogogateDoorAccessory);
-          this.bindChargingStateCharacteristic(HKService1);
-          this.bindStatusLowBatteryCharacteristic(HKService1);
-
-          let HKService2 = myGogogateDoorAccessory.getServiceByUUIDAndSubType(
-            doorName,
-            'Temp' + this.sensors[i]
-          );
-
-          if (!HKService2) {
-            this.log('INFO - Creating  Service ' + doorName + '/' + 'Temp' + this.sensors[i]);
-            HKService2 = new Service.TemperatureSensor(doorName, 'Temp' + this.sensors[i]);
-            HKService2.subtype = 'Temp' + this.sensors[i];
-            myGogogateDoorAccessory.addService(HKService2);
-          }
-
-          HKService2.gateId = i + 1;
-
-          this.bindCurrentTemperatureLevelCharacteristic(HKService2, myGogogateDoorAccessory);
         }
       }
-    }
-  },
+      this.refreshAllDoors();
+      //timer for background refresh
+      this.refreshBackground();
+    } else {
+      this.log('ERROR - discoverDoors - no door found, will retry in 1 minute - ' + doors);
 
-  refreshAllDoors: function () {
-    this.log.debug('INFO - Refreshing status ');
-
-    for (let a = 0; a < this.foundAccessories.length; a++) {
-      let myGogogateAccessory = this.foundAccessories[a];
-
-      for (let s = 0; s < myGogogateAccessory.services.length; s++) {
-        let service = myGogogateAccessory.services[s];
-        if (service.UUID == Service.GarageDoorOpener.UUID) {
-          this.log.debug('INFO - refreshAllDoors - Door : ' + service.subtype);
-          this.gogogateAPI.refreshDoor(service);
-        } else if (service.UUID == Service.TemperatureSensor.UUID) {
-          this.log.debug('INFO - refreshAllDoors - Temp : ' + service.subtype);
-          this.gogogateAPI.refreshSensor(service, null, GogogateConst.TEMP_SENSOR);
-        } else if (service.UUID == Service.BatteryService.UUID) {
-          this.log.debug('INFO - refreshAllDoors - Battery : ' + service.subtype);
-          this.gogogateAPI.refreshSensor(service, null, GogogateConst.BATTERY_SENSOR);
-        }
-      }
+      setTimeout(() => {
+        this.gogogateAPI.getDoors();
+      }, 60000);
     }
   },
 
@@ -264,7 +276,23 @@ Gogogate2Platform.prototype = {
     return false;
   },
 
-  handleRefreshDoor(statusbody, service, callback, characteristic) {
+  handleRefreshDoor(statusbody, gateId) {
+    //retrieve service
+    var service;
+    let myGogogateDoorAccessory = this.foundAccessories.find((x) => x.gateId == gateId);
+
+    if (myGogogateDoorAccessory) {
+      service = myGogogateDoorAccessory.getServiceByUUIDAndSubType(
+        myGogogateDoorAccessory.name,
+        'GarageDoorOpener' + myGogogateDoorAccessory.name
+      );
+    }
+
+    if (!service) {
+      this.log('Error - handleRefreshDoor - ' + gateId + ' - no service found');
+      return;
+    }
+
     let currentDoorState =
       statusbody == 'OK'
         ? Characteristic.CurrentDoorState.OPEN
@@ -310,126 +338,85 @@ Gogogate2Platform.prototype = {
       newTargetState = currentDoorState;
     }
 
-    if (callback) {
-      if (characteristic == Characteristic.CurrentDoorState) {
-        this.log.debug(
-          'INFO - refreshDoor - ' +
-            service.subtype +
-            ' calling callback on CurrentDoorState with value : ' +
-            this.gogogateAPI.getStateString(newDoorState)
-        );
-        callback(undefined, newDoorState);
-
-        //No operation in progress, ensure that target state is in sync if status has changed.
-        if (!operationInProgress) {
-          setImmediate(() => {
-            service.getCharacteristic(Characteristic.TargetDoorState).updateValue(newTargetState);
-          });
-        }
-      } else if (characteristic == Characteristic.TargetDoorState) {
-        this.log.debug(
-          'INFO - refreshDoor - ' +
-            service.subtype +
-            ' calling callback on TargetDoorState with value : ' +
-            this.gogogateAPI.getStateString(newTargetState)
-        );
-        callback(undefined, newTargetState);
-      }
-    } else {
-      if (newTargetState != oldTargetState) {
-        this.log.debug(
-          'INFO - refreshDoor - ' +
-            service.subtype +
-            ' updating TargetDoorState to : ' +
-            this.gogogateAPI.getStateString(newTargetState)
-        );
-        //TargetDoorState before CurrentDoorState
-        setImmediate(() => {
-          service.getCharacteristic(Characteristic.TargetDoorState).updateValue(newTargetState);
-        });
-      }
-
-      if (newDoorState != oldDoorState) {
-        this.log.debug(
-          'INFO - refreshDoor - ' +
-            service.subtype +
-            ' updating CurrentDoorState to : ' +
-            this.gogogateAPI.getStateString(newDoorState)
-        );
-        setImmediate(() => {
-          service.getCharacteristic(Characteristic.CurrentDoorState).updateValue(newDoorState);
-        });
-      }
-    }
-  },
-
-  handleRefreshSensor(service, statusbody, callback, type) {
-    this.log.debug('INFO - refreshSensor with body  : ' + statusbody);
-
-    let res = JSON.parse(statusbody);
-
-    var newVal;
-    var charToUpdate = undefined;
-    if (type == BATTERY_SENSOR) {
-      newVal = GogogateTools.normalizeBattery(res[1]);
-      charToUpdate = Characteristic.BatteryLevel;
-      this.log.debug('INFO - refreshBattery with value  : ' + newVal);
-    } else {
-      newVal = res[0] / 1000;
-      charToUpdate = Characteristic.CurrentTemperature;
-      this.log.debug('INFO - refreshTemp with value  : ' + newVal);
-    }
-
-    if (callback) {
-      callback(undefined, newVal);
-    } else {
+    if (newTargetState != oldTargetState) {
+      this.log.debug(
+        'INFO - refreshDoor - ' +
+          service.subtype +
+          ' updating TargetDoorState to : ' +
+          this.gogogateAPI.getStateString(newTargetState)
+      );
+      //TargetDoorState before CurrentDoorState
       setImmediate(() => {
-        service.getCharacteristic(charToUpdate).updateValue(newVal);
+        service.getCharacteristic(Characteristic.TargetDoorState).updateValue(newTargetState);
+      });
+    }
+
+    if (newDoorState != oldDoorState) {
+      this.log.debug(
+        'INFO - refreshDoor - ' +
+          service.subtype +
+          ' updating CurrentDoorState to : ' +
+          this.gogogateAPI.getStateString(newDoorState)
+      );
+      setImmediate(() => {
+        service.getCharacteristic(Characteristic.CurrentDoorState).updateValue(newDoorState);
       });
     }
   },
 
-  getCurrentDoorStateCharacteristic: function (homebridgeAccessory, service, callback) {
-    //operationInProgress, returns current state
-    if (service.TargetDoorStateOperationStart !== undefined) {
-      callback(undefined, service.getCharacteristic(Characteristic.CurrentDoorState).value);
-    } else {
-      this.log.debug(
-        'INFO - GET Characteristic.CurrentDoorState - ' +
-          service.subtype +
-          ' - Real state through REFRESHDOOR'
-      );
+  handleRefreshSensor(statusbody, gateId) {
+    this.log.debug('INFO - refreshSensor with body  : ' + statusbody);
+    let res = JSON.parse(statusbody);
+    var newVal;
 
-      homebridgeAccessory.platform.gogogateAPI.refreshDoor(
-        service,
-        callback,
-        Characteristic.CurrentDoorState
-      );
+    //retrieve service
+    var batteryService;
+    var tempService;
+    let myGogogateDoorAccessory = this.foundAccessories.find((x) => x.gateId == gateId);
+
+    if (myGogogateDoorAccessory) {
+      for (let s = 0; s < myGogogateDoorAccessory.services.length; s++) {
+        let service = myGogogateDoorAccessory.services[s];
+        if (service.UUID == Service.TemperatureSensor.UUID) {
+          tempService = service;
+        } else if (service.UUID == Service.BatteryService.UUID) {
+          batteryService = service;
+        }
+      }
+    }
+
+    if (!batteryService) {
+      this.log('Error - handleRefreshSensor - ' + batteryService.subtype + ' - service not found');
+    } else {
+      newVal = GogogateTools.normalizeBattery(res[1]);
+      this.log.debug('INFO - refreshBattery with value  : ' + newVal);
+      batteryService.getCharacteristic(Characteristic.BatteryLevel).updateValue(newVal);
+    }
+
+    if (!tempService) {
+      this.log('Error - handleRefreshSensor - ' + batteryService.subtype + ' - service not found');
+    } else {
+      newVal = res[0] / 1000;
+      this.log.debug('INFO - refreshTemp with value  : ' + newVal);
+      tempService.getCharacteristic(Characteristic.CurrentTemperature).updateValue(newVal);
+    }
+  },
+
+  getCurrentDoorStateCharacteristic: function (homebridgeAccessory, service, callback) {
+    callback(undefined, service.getCharacteristic(Characteristic.CurrentDoorState).value);
+
+    //no operationInProgress, refresh current state
+    if (service.TargetDoorStateOperationStart == undefined) {
+      this.gogogateAPI.refreshDoor(service.gateId);
     }
   },
 
   getTargetDoorStateCharacteristic: function (homebridgeAccessory, service, callback) {
-    if (service.TargetDoorState !== undefined) {
-      this.log.debug(
-        'INFO - GET Characteristic.TargetDoorState - ' +
-          service.subtype +
-          ' - callback with state : ' +
-          this.gogogateAPI.getStateString(service.TargetDoorState)
-      );
+    callback(undefined, service.TargetDoorState);
 
-      callback(undefined, service.TargetDoorState);
-    } else {
-      this.log.debug(
-        'INFO - GET Characteristic.TargetDoorState - ' +
-          service.subtype +
-          ' - Real state through REFRESHDOOR'
-      );
-
-      homebridgeAccessory.platform.gogogateAPI.refreshDoor(
-        service,
-        callback,
-        Characteristic.TargetDoorState
-      );
+    //no operationInProgress, refresh current state
+    if (service.TargetDoorStateOperationStart == undefined) {
+      this.gogogateAPI.refreshDoor(service.gateId);
     }
   },
 
@@ -451,7 +438,7 @@ Gogogate2Platform.prototype = {
           this.gogogateAPI.getStateString(currentState)
       );
 
-      homebridgeAccessory.platform.gogogateAPI.activateDoor(service, function (error) {
+      this.gogogateAPI.activateDoor(service, function (error) {
         if (error) {
           that.endDoorOperation(service);
           setImmediate(() => {
@@ -479,11 +466,7 @@ Gogogate2Platform.prototype = {
     service.getCharacteristic(Characteristic.CurrentDoorState).on(
       'get',
       function (callback) {
-        homebridgeAccessory.platform.getCurrentDoorStateCharacteristic(
-          homebridgeAccessory,
-          service,
-          callback
-        );
+        this.getCurrentDoorStateCharacteristic(homebridgeAccessory, service, callback);
       }.bind(this)
     );
   },
@@ -494,22 +477,13 @@ Gogogate2Platform.prototype = {
       .on(
         'get',
         function (callback) {
-          homebridgeAccessory.platform.getTargetDoorStateCharacteristic(
-            homebridgeAccessory,
-            service,
-            callback
-          );
+          this.getTargetDoorStateCharacteristic(homebridgeAccessory, service, callback);
         }.bind(this)
       )
       .on(
         'set',
         function (value, callback) {
-          homebridgeAccessory.platform.setTargetDoorStateCharacteristic(
-            homebridgeAccessory,
-            service,
-            value,
-            callback
-          );
+          this.setTargetDoorStateCharacteristic(homebridgeAccessory, service, value, callback);
         }.bind(this)
       );
   },
@@ -524,21 +498,23 @@ Gogogate2Platform.prototype = {
   },
 
   bindBatteryLevelCharacteristic: function (service, homebridgeAccessory) {
-    let type = GogogateConst.BATTERY_SENSOR;
     service.getCharacteristic(Characteristic.BatteryLevel).on(
       'get',
       function (callback) {
-        homebridgeAccessory.platform.gogogateAPI.refreshSensor(service, callback, type);
+        var percent = service.getCharacteristic(Characteristic.BatteryLevel).value;
+        callback(undefined, percent);
+        this.gogogateAPI.refreshSensor(service.gateId);
       }.bind(this)
     );
   },
 
   bindCurrentTemperatureLevelCharacteristic: function (service, homebridgeAccessory) {
-    let type = GogogateConst.TEMP_SENSOR;
     service.getCharacteristic(Characteristic.CurrentTemperature).on(
       'get',
       function (callback) {
-        homebridgeAccessory.platform.gogogateAPI.refreshSensor(service, callback, type);
+        var temp = service.getCharacteristic(Characteristic.CurrentTemperature).value;
+        callback(undefined, temp);
+        this.gogogateAPI.refreshSensor(service.gateId);
       }.bind(this)
     );
   },
@@ -614,6 +590,35 @@ Gogogate2Platform.prototype = {
         clearInterval(this.timerID);
         this.timerID = undefined;
         this.refreshBackground();
+      }
+    }
+  },
+
+  refreshBackground() {
+    //timer for background refresh
+    if (this.refreshTimer !== undefined && this.refreshTimer > 0) {
+      this.log.debug(
+        'INFO - Setting Timer for background refresh every  : ' + this.refreshTimer + 's'
+      );
+      this.timerID = setInterval(() => this.refreshAllDoors(), this.refreshTimer * 1000);
+    }
+  },
+
+  refreshAllDoors: function () {
+    for (let a = 0; a < this.foundAccessories.length; a++) {
+      this.log.debug('INFO - refreshing - ' + this.foundAccessories[a].name);
+      let myGogogateAccessory = this.foundAccessories[a];
+
+      for (let s = 0; s < myGogogateAccessory.services.length; s++) {
+        let service = myGogogateAccessory.services[s];
+        if (service.UUID == Service.GarageDoorOpener.UUID) {
+          this.log.debug('INFO - refreshAllDoors - Door : ' + service.subtype);
+          this.gogogateAPI.refreshDoor(service.gateId);
+        } else if (service.UUID == Service.TemperatureSensor.UUID) {
+          this.log.debug('INFO - refreshAllDoors - Temp / Battery : ' + service.subtype);
+          this.gogogateAPI.refreshSensor(service.gateId);
+          //battery will be done with temp
+        }
       }
     }
   },

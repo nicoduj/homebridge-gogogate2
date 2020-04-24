@@ -2,24 +2,29 @@ var request = require('request');
 const $ = require('cheerio');
 const GogogateTools = require('./gogogateTools.js');
 
+var EventEmitter = require('events');
+var inherits = require('util').inherits;
+
 module.exports = {
   GogogateAPI: GogogateAPI,
 };
 
 function GogogateAPI(log, platform) {
+  EventEmitter.call(this);
+
   this.log = log;
   this.platform = platform;
   this.gogogateIP = platform.gogogateIP;
   this.username = platform.username;
   this.password = platform.password;
+  this.discoverdDoors = [];
+  this.discoverdSensors = [];
   request = request.defaults({jar: true});
 }
 
 function isLoginError(statuserror) {
   return (
-    (statuserror &&
-      statuserror.code &&
-      statuserror.code.includes('ECONNREFUSED')) ||
+    (statuserror && statuserror.code && statuserror.code.includes('ECONNREFUSED')) ||
     (statuserror &&
       (typeof statuserror === 'string' || statuserror instanceof String) &&
       statuserror.includes('Restricted Access'))
@@ -29,8 +34,7 @@ function isLoginError(statuserror) {
 function isNetworkError(statuserror) {
   return (
     statuserror &&
-    (statuserror.code.includes('ENETUNREACH') ||
-      statuserror.code.includes('EHOSTUNREACH'))
+    (statuserror.code.includes('ENETUNREACH') || statuserror.code.includes('EHOSTUNREACH'))
   );
 }
 
@@ -39,7 +43,7 @@ function isTimeoutError(statuserror) {
 }
 
 GogogateAPI.prototype = {
-  getStateString: function(state) {
+  getStateString: function (state) {
     if (state == 0) return 'OPEN';
     else if (state == 1) return 'CLOSED';
     else if (state == 2) return 'OPENING';
@@ -47,7 +51,7 @@ GogogateAPI.prototype = {
     else if (state == 4) return 'STOPPED';
   },
 
-  handleError: function(statuserror) {
+  handleError: function (statuserror) {
     //ERRORS :
 
     // no network connectivity
@@ -62,11 +66,9 @@ GogogateAPI.prototype = {
     this.log.debug(statuserror);
     // if we have a login error, try to reconnect
     if (isLoginError(statuserror)) {
-      this.log(
-        'WARNING - handleError - Connection refused, trying to reconnect'
-      );
+      this.log('WARNING - handleError - Connection refused, trying to reconnect');
       this.logout(() => {
-        this.login(success => {
+        this.login((success) => {
           if (success) {
             this.log('INFO - handleError - Reconnection is ok');
           }
@@ -76,20 +78,16 @@ GogogateAPI.prototype = {
     // check for network connectivity
     else if (isNetworkError(statuserror)) {
       //Try to send a WOL ?
-      this.log(
-        'ERROR - handleError - No network connectivity, check gogogate accessibility'
-      );
+      this.log('ERROR - handleError - No network connectivity, check gogogate accessibility');
     }
     //else print error
     else if (isTimeoutError(statuserror)) {
       //Try to send a WOL ?
-      this.log(
-        'ERROR - handleError - timeout connecting to gogogate, check gogogate connectivity'
-      );
+      this.log('ERROR - handleError - timeout connecting to gogogate, check gogogate connectivity');
     }
   },
 
-  login: function(callback) {
+  login: function (callback) {
     let formData = {
       login: this.username,
       pass: this.password,
@@ -120,7 +118,7 @@ GogogateAPI.prototype = {
     });
   },
 
-  logout: function(callback) {
+  logout: function (callback) {
     let formData = {
       logout: 'submit',
     };
@@ -147,52 +145,46 @@ GogogateAPI.prototype = {
     });
   },
 
-  getDoors: function(callback) {
-    let infoURL =
-      'http://' + this.gogogateIP + '/index.php?op=config&opc=doors';
+  getDoors: function () {
+    this.login((success) => {
+      if (success) {
+        let infoURL = 'http://' + this.gogogateIP + '/index.php?op=config&opc=doors';
 
-    var that = this;
+        var that = this;
 
-    request(infoURL, function optionalCallback(
-      statuserror,
-      statusresponse,
-      statusbody
-    ) {
-      if (statuserror) {
-        that.log('ERROR - getDoors - Can not retrieve doors');
-        callback(false);
+        request(infoURL, function optionalCallback(statuserror, statusresponse, statusbody) {
+          if (statuserror) {
+            that.log('ERROR - getDoors - Can not retrieve doors');
+            that.emit('doorsRetrieveError');
+          } else {
+            that.discoverdDoors = [
+              $('input[name="dname1"]', '#config-door1', statusbody).val(),
+              $('input[name="dname2"]', '#config-door2', statusbody).val(),
+              $('input[name="dname3"]', '#config-door3', statusbody).val(),
+            ];
+            that.discoverdSensors = [
+              $('input[name="door1"]', '#config-door1', statusbody).val(),
+              $('input[name="door2"]', '#config-door2', statusbody).val(),
+              $('input[name="door3"]', '#config-door3', statusbody).val(),
+            ];
+            that.log.debug('INFO - DOORS NAMES found : ' + that.discoverdDoors);
+            that.log.debug('INFO - SENSORS NAMES found : ' + that.discoverdSensors);
+
+            that.emit('doorsRetrieved');
+          }
+        });
       } else {
-        that.platform.doors = [
-          $('input[name="dname1"]', '#config-door1', statusbody).val(),
-          $('input[name="dname2"]', '#config-door2', statusbody).val(),
-          $('input[name="dname3"]', '#config-door3', statusbody).val(),
-        ];
-        that.platform.sensors = [
-          $('input[name="door1"]', '#config-door1', statusbody).val(),
-          $('input[name="door2"]', '#config-door2', statusbody).val(),
-          $('input[name="door3"]', '#config-door3', statusbody).val(),
-        ];
-        that.log.debug('INFO - DOORS NAMES found : ' + that.platform.doors);
-        that.log.debug('INFO - SENSORS NAMES found : ' + that.platform.sensors);
-        callback(true);
+        that.emit('doorsRetrieveError');
       }
     });
   },
 
-  refreshDoor: function(service, callback, characteristic) {
+  refreshDoor: function (gateId) {
     var that = this;
 
-    let infoURL =
-      'http://' +
-      this.gogogateIP +
-      '/isg/statusDoor.php?numdoor=' +
-      service.gateId;
+    let infoURL = 'http://' + this.gogogateIP + '/isg/statusDoor.php?numdoor=' + gateId;
 
-    request(infoURL, function optionalCallback(
-      statuserror,
-      statusresponse,
-      statusbody
-    ) {
+    request(infoURL, function optionalCallback(statuserror, statusresponse, statusbody) {
       that.log.debug(
         'INFO - statusbody : *' +
           statusbody +
@@ -202,43 +194,26 @@ GogogateAPI.prototype = {
 
       if (statuserror) {
         that.log(
-          'ERROR - refreshDoor - Refreshing status for ' +
-            service.subtype +
-            ' Door failed - ' +
-            JSON.stringify(statusresponse)
+          'ERROR - refreshDoor - Refreshing status failed - ' + JSON.stringify(statusresponse)
         );
         that.handleError(statuserror);
-
-        if (callback) callback(undefined, undefined);
+        that.emit('doorRefreshError', gateId);
       } else {
-        that.platform.handleRefreshDoor(
-          statusbody,
-          service,
-          callback,
-          characteristic
-        );
+        that.emit('doorRefreshed', gateId, statusbody);
       }
     });
   },
 
-  refreshSensor: function(service, callback, type) {
+  refreshSensor: function (gateId) {
     var that = this;
 
-    let infoURL =
-      'http://' +
-      this.gogogateIP +
-      '/isg/temperature.php?door=' +
-      service.gateId;
+    let infoURL = 'http://' + this.gogogateIP + '/isg/temperature.php?door=' + gateId;
 
-    request(infoURL, function optionalCallback(
-      statuserror,
-      statusresponse,
-      statusbody
-    ) {
+    request(infoURL, function optionalCallback(statuserror, statusresponse, statusbody) {
       if (statuserror) {
         that.log('ERROR - refreshSensor -  failed');
         that.handleError(statuserror);
-        if (callback) callback(undefined, undefined);
+        that.emit('sensorRefreshError', gateId);
       } else if (!GogogateTools.IsJsonString(statusbody)) {
         that.log(
           'ERROR - refreshSensor -  failed - no JSON body -' +
@@ -247,27 +222,19 @@ GogogateAPI.prototype = {
             JSON.stringify(statusresponse)
         );
         that.handleError(statusbody);
-        if (callback) callback(undefined, undefined);
+        that.emit('sensorRefreshError', gateId);
       } else {
-        that.platform.handleRefreshSensor(service, statusbody, callback, type);
+        that.emit('sensorRefreshed', gateId, statusbody);
       }
     });
   },
 
-  activateDoor: function(service, callback) {
-    let commandURL =
-      'http://' +
-      this.gogogateIP +
-      '/isg/opendoor.php?numdoor=' +
-      service.gateId;
+  activateDoor: function (service, callback) {
+    let commandURL = 'http://' + this.gogogateIP + '/isg/opendoor.php?numdoor=' + service.gateId;
 
     var that = this;
 
-    request(commandURL, function optionalCallback(
-      statuserror,
-      statusresponse,
-      statusbody
-    ) {
+    request(commandURL, function optionalCallback(statuserror, statusresponse, statusbody) {
       if (statuserror) {
         that.log(
           'ERROR - activateDoor - ERROR while sending command -' +
@@ -279,11 +246,11 @@ GogogateAPI.prototype = {
 
         callback(true);
       } else {
-        that.log.debug(
-          'INFO - activateDoor - Command sent to ' + service.subtype
-        );
+        that.log.debug('INFO - activateDoor - Command sent to ' + service.subtype);
         callback(false);
       }
     });
   },
 };
+
+inherits(GogogateAPI, EventEmitter);

@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.1.0
+
+- [NEW] event based logic for faster refresh, speed improvments.
+
 ## 1.0.7
 
 - Bump dep versions for homebridge verified plugin process
