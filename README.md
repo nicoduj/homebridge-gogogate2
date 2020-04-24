@@ -14,7 +14,9 @@
 
 [![Support via PayPal][paypal-button]][paypal-nicoduj]
 
-[Gogogate 2](https://www.gogogate.com) plugin for [HomeBridge](https://github.com/nfarina/homebridge) using http calls.
+<img src="https://user-images.githubusercontent.com/19813688/80208881-5d984080-8631-11ea-9903-36224778c8d4.PNG" width="25%" align="right">
+
+[Gogogate 2](https://www.gogogate.com) - old model, not iSmartGate that is natively homekit enabled - plugin for [HomeBridge](https://github.com/nfarina/homebridge) using http calls.
 
 This plugin will add your doors connected to gogogate to homekit. It can update in the background so that openning / closing outside home app can trigger your automations. It will also display battery sensor and temperature from your wireless sensors.
 
@@ -51,6 +53,7 @@ Fields:
 - `refreshTimer` Optional - enable refresh of doors state every X seconds, for automation purpose if you need to activate something else based on a state change of a door by another means than homekit. Be aware it might make you gogoggate smokes since the plugin will ask its status very often :) (defaults : disable, accepted range : 30-600s).
 - `maxWaitTimeForOperation` Optional - set the maximum time that we wait for door operation to complete. When elapsed, check the current State again and updates accordingly. (defaults : 30s, accepted range : 30-90s).
 - `refreshTimerDuringOperation` Optional - set the refresh timer during operation in progress to detect the end of the operation. (defaults : 10s, accepted range : 2-15s).
+- `cleanCache` Set it to true in case you want to remove the cached accessory (only those from this plugin). You have to restart homebridge after applying the option. Remove it after restart, otherwise it will be recreated at each startup.
 
 ## Changelog
 
