@@ -6,7 +6,7 @@
 [![npm](https://img.shields.io/npm/dw/homebridge-gogogate2.svg)](https://www.npmjs.com/package/homebridge-gogogate2)
 [![npm](https://img.shields.io/npm/dt/homebridge-gogogate2.svg)](https://www.npmjs.com/package/homebridge-gogogate2)
 
-[![CodeFactor](https://www.codefactor.io/repository/github/nicoduj/homebridge-gogogate2/badge)](https://www.codefactor.io/repository/github/nicoduj/homebridge-gogogate2)
+[![CodeFactor](https://www.codefactor.io/repository/github/nicoduj/homebridge-gogogate2/badge/dynamicplatform)](https://www.codefactor.io/repository/github/nicoduj/homebridge-gogogate2/overview/dynamicplatform)
 [![Build Status](https://travis-ci.com/nicoduj/homebridge-gogogate2.svg?branch=master)](https://travis-ci.com/nicoduj/homebridge-gogogate2)
 [![Known Vulnerabilities](https://snyk.io/test/github/nicoduj/homebridge-gogogate2/badge.svg?targetFile=package.json)](https://snyk.io/test/github/nicoduj/homebridge-gogogate2?targetFile=package.json)
 

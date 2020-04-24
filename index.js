@@ -1,7 +1,6 @@
 var Service, Characteristic, Accessory, UUIDGen;
 
 var GogogateAPI = require('./gogogateAPI.js').GogogateAPI;
-const GogogateConst = require('./gogogateConst');
 const GogogateTools = require('./gogogateTools.js');
 
 String.prototype.isEmpty = function () {
@@ -222,7 +221,7 @@ Gogogate2Platform.prototype = {
             }
             HKService1.gateId = i + 1;
 
-            this.bindBatteryLevelCharacteristic(HKService1, myGogogateDoorAccessory);
+            this.bindBatteryLevelCharacteristic(HKService1);
             this.bindChargingStateCharacteristic(HKService1);
             this.bindStatusLowBatteryCharacteristic(HKService1);
 
@@ -240,7 +239,7 @@ Gogogate2Platform.prototype = {
 
             HKService2.gateId = i + 1;
 
-            this.bindCurrentTemperatureLevelCharacteristic(HKService2, myGogogateDoorAccessory);
+            this.bindCurrentTemperatureLevelCharacteristic(HKService2);
           }
         }
       }
@@ -497,7 +496,7 @@ Gogogate2Platform.prototype = {
     );
   },
 
-  bindBatteryLevelCharacteristic: function (service, homebridgeAccessory) {
+  bindBatteryLevelCharacteristic: function (service) {
     service.getCharacteristic(Characteristic.BatteryLevel).on(
       'get',
       function (callback) {
@@ -508,7 +507,7 @@ Gogogate2Platform.prototype = {
     );
   },
 
-  bindCurrentTemperatureLevelCharacteristic: function (service, homebridgeAccessory) {
+  bindCurrentTemperatureLevelCharacteristic: function (service) {
     service.getCharacteristic(Characteristic.CurrentTemperature).on(
       'get',
       function (callback) {
