@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.1.1
+
+- [NEW] minor improvment in opening / closing process.
+
 ## 1.1.0
 
 - [NEW] event based logic for faster refresh, speed improvments.

@@ -229,8 +229,8 @@ GogogateAPI.prototype = {
     });
   },
 
-  activateDoor: function (service, callback) {
-    let commandURL = 'http://' + this.gogogateIP + '/isg/opendoor.php?numdoor=' + service.gateId;
+  activateDoor: function (gateId, callback) {
+    let commandURL = 'http://' + this.gogogateIP + '/isg/opendoor.php?numdoor=' + gateId;
 
     var that = this;
 
@@ -246,7 +246,7 @@ GogogateAPI.prototype = {
 
         callback(true);
       } else {
-        that.log.debug('INFO - activateDoor - Command sent to ' + service.subtype);
+        that.log.debug('INFO - activateDoor - Command sent');
         callback(false);
       }
     });

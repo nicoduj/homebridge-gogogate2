@@ -199,9 +199,9 @@ Gogogate2Platform.prototype = {
 
           HKService.gateId = i + 1;
 
-          this.bindCurrentDoorStateCharacteristic(HKService, myGogogateDoorAccessory);
-          this.bindTargetDoorStateCharacteristic(HKService, myGogogateDoorAccessory);
-          this.bindObstructionDetectedCharacteristic(HKService, myGogogateDoorAccessory);
+          this.bindCurrentDoorStateCharacteristic(HKService);
+          this.bindTargetDoorStateCharacteristic(HKService);
+          this.bindObstructionDetectedCharacteristic(HKService);
 
           if (sensors[i] && !sensors[i].isEmpty()) {
             this.log('INFO - Discovered sensor : ' + sensors[i]);
@@ -401,7 +401,7 @@ Gogogate2Platform.prototype = {
     }
   },
 
-  getCurrentDoorStateCharacteristic: function (homebridgeAccessory, service, callback) {
+  getCurrentDoorStateCharacteristic: function (service, callback) {
     callback(undefined, service.getCharacteristic(Characteristic.CurrentDoorState).value);
 
     //no operationInProgress, refresh current state
@@ -410,19 +410,18 @@ Gogogate2Platform.prototype = {
     }
   },
 
-  getTargetDoorStateCharacteristic: function (homebridgeAccessory, service, callback) {
-    callback(undefined, service.TargetDoorState);
+  getTargetDoorStateCharacteristic: function (service, callback) {
+    callback(undefined, service.getCharacteristic(Characteristic.TargetDoorState).value);
 
-    //no operationInProgress, refresh current state
-    if (service.TargetDoorStateOperationStart == undefined) {
-      this.gogogateAPI.refreshDoor(service.gateId);
-    }
+    //Target is updated through event
   },
 
-  setTargetDoorStateCharacteristic: function (homebridgeAccessory, service, value, callback) {
+  setTargetDoorStateCharacteristic: function (service, value, callback) {
     var currentValue = service.getCharacteristic(Characteristic.TargetDoorState).value;
-
     var currentState = service.getCharacteristic(Characteristic.CurrentDoorState).value;
+
+    callback();
+
     var that = this;
 
     if (
@@ -437,13 +436,13 @@ Gogogate2Platform.prototype = {
           this.gogogateAPI.getStateString(currentState)
       );
 
-      this.gogogateAPI.activateDoor(service, function (error) {
+      this.gogogateAPI.activateDoor(service.gateId, function (error) {
         if (error) {
           that.endDoorOperation(service);
-          setImmediate(() => {
+          setTimeout(() => {
             service.getCharacteristic(Characteristic.TargetDoorState).updateValue(currentValue);
             service.getCharacteristic(Characteristic.CurrentDoorState).updateValue(currentState);
-          });
+          }, 500);
           that.log.debug(
             'ERROR - SET Characteristic.TargetDoorState - ' + service.subtype + ' error activating '
           );
@@ -458,31 +457,30 @@ Gogogate2Platform.prototype = {
         }
       });
     }
-    callback();
   },
 
-  bindCurrentDoorStateCharacteristic: function (service, homebridgeAccessory) {
+  bindCurrentDoorStateCharacteristic: function (service) {
     service.getCharacteristic(Characteristic.CurrentDoorState).on(
       'get',
       function (callback) {
-        this.getCurrentDoorStateCharacteristic(homebridgeAccessory, service, callback);
+        this.getCurrentDoorStateCharacteristic(service, callback);
       }.bind(this)
     );
   },
 
-  bindTargetDoorStateCharacteristic: function (service, homebridgeAccessory) {
+  bindTargetDoorStateCharacteristic: function (service) {
     service
       .getCharacteristic(Characteristic.TargetDoorState)
       .on(
         'get',
         function (callback) {
-          this.getTargetDoorStateCharacteristic(homebridgeAccessory, service, callback);
+          this.getTargetDoorStateCharacteristic(service, callback);
         }.bind(this)
       )
       .on(
         'set',
         function (value, callback) {
-          this.setTargetDoorStateCharacteristic(homebridgeAccessory, service, value, callback);
+          this.setTargetDoorStateCharacteristic(service, value, callback);
         }.bind(this)
       );
   },
