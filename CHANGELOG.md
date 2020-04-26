@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.1.2
+
+- [FIX] reset targetState at startup just in case
+- [NEW] cleaning lost devices from cache
+
 ## 1.1.1
 
 - [NEW] minor improvment in opening / closing process.

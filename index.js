@@ -44,6 +44,10 @@ function Gogogate2Platform(log, config, api) {
   this.cleanCache = config['cleanCache'];
 
   this.foundAccessories = [];
+
+  this._confirmedAccessories = [];
+  this._confirmedServices = [];
+
   this.gogogateAPI = new GogogateAPI(log, this);
 
   if (api) {
@@ -97,6 +101,52 @@ Gogogate2Platform.prototype = {
     }
 
     this.gogogateAPI.logout(() => {});
+  },
+
+  //Cleaning methods
+  cleanPlatform: function () {
+    this.cleanAccessories();
+    this.cleanServices();
+  },
+
+  cleanAccessories: function () {
+    //cleaning accessories
+    let accstoRemove = [];
+    for (let acc of this.foundAccessories) {
+      if (!this._confirmedAccessories.find((x) => x.UUID == acc.UUID)) {
+        accstoRemove.push(acc);
+        this.log('WARNING - Accessory will be Removed ' + acc.UUID + '/' + acc.displayName);
+      }
+    }
+
+    if (accstoRemove.length > 0)
+      this.api.unregisterPlatformAccessories('homebridge-gogogate2', 'GogoGate2', accstoRemove);
+  },
+
+  cleanServices: function () {
+    //cleaning services
+    for (let acc of this.foundAccessories) {
+      let servicestoRemove = [];
+      for (let serv of acc.services) {
+        if (
+          serv.subtype !== undefined &&
+          !this._confirmedServices.find((x) => x.UUID == serv.UUID && x.subtype == serv.subtype)
+        ) {
+          servicestoRemove.push(serv);
+        }
+      }
+      for (let servToDel of servicestoRemove) {
+        this.log(
+          'WARNING - Service Removed' +
+            servToDel.UUID +
+            '/' +
+            servToDel.subtype +
+            '/' +
+            servToDel.displayName
+        );
+        acc.removeService(servToDel);
+      }
+    }
   },
 
   discoverDoors: function () {
@@ -203,6 +253,9 @@ Gogogate2Platform.prototype = {
           this.bindTargetDoorStateCharacteristic(HKService);
           this.bindObstructionDetectedCharacteristic(HKService);
 
+          this._confirmedAccessories.push(myGogogateDoorAccessory);
+          this._confirmedServices.push(HKService);
+
           if (sensors[i] && !sensors[i].isEmpty()) {
             this.log('INFO - Discovered sensor : ' + sensors[i]);
 
@@ -240,9 +293,14 @@ Gogogate2Platform.prototype = {
             HKService2.gateId = i + 1;
 
             this.bindCurrentTemperatureLevelCharacteristic(HKService2);
+
+            this._confirmedServices.push(HKService1);
+            this._confirmedServices.push(HKService2);
           }
         }
       }
+
+      this.cleanPlatform();
       this.refreshAllDoors();
       //timer for background refresh
       this.refreshBackground();
@@ -469,6 +527,11 @@ Gogogate2Platform.prototype = {
   },
 
   bindTargetDoorStateCharacteristic: function (service) {
+    //at startup, set to currentstate to reset
+    service
+      .getCharacteristic(Characteristic.TargetDoorState)
+      .updateValue(service.getCharacteristic(Characteristic.CurrentDoorState).value);
+
     service
       .getCharacteristic(Characteristic.TargetDoorState)
       .on(
