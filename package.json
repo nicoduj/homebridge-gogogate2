@@ -5,7 +5,9 @@
   "description": "Publish your gogogate 2 to homebridge",
   "main": "index.js",
   "scripts": {
-    "test": "node index.js && echo \"No syntax errors! (node $(node -v))\""
+    "test": "node index.js && echo \"No syntax errors! (node $(node -v))\"",
+    "snyk-protect": "snyk protect",
+    "prepublish": "npm run snyk-protect"
   },
   "license": "ISC",
   "repository": {
@@ -24,7 +26,8 @@
   ],
   "dependencies": {
     "cheerio": "^1.0.0-rc.3",
-    "request": "^2.88.2"
+    "request": "^2.88.2",
+    "snyk": "^1.316.1"
   },
   "bugs": {
     "url": "https://github.com/nicoduj/homebridge-gogogate2/issues"
@@ -45,5 +48,6 @@
     "hooks": {
       "pre-commit": "pretty-quick --staged"
     }
-  }
+  },
+  "snyk": true
 }
