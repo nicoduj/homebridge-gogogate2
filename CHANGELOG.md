@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.1.3
+
+- [NEW] funding link
+
 ## 1.1.2
 
 - [FIX] reset targetState at startup just in case
