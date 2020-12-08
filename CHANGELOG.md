@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.1.4
+
+- [FIX] unresponsive in case of negative temperature #46
+
 ## 1.1.3
 
 - [NEW] funding link

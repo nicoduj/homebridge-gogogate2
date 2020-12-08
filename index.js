@@ -569,14 +569,21 @@ Gogogate2Platform.prototype = {
   },
 
   bindCurrentTemperatureLevelCharacteristic: function (service) {
-    service.getCharacteristic(Characteristic.CurrentTemperature).on(
-      'get',
-      function (callback) {
-        var temp = service.getCharacteristic(Characteristic.CurrentTemperature).value;
-        callback(undefined, temp);
-        this.gogogateAPI.refreshSensor(service.gateId);
-      }.bind(this)
-    );
+    service
+      .getCharacteristic(Characteristic.CurrentTemperature)
+      //to handle negative temps
+      .setProps({
+        minValue: -50,
+        maxValue: 50,
+      })
+      .on(
+        'get',
+        function (callback) {
+          var temp = service.getCharacteristic(Characteristic.CurrentTemperature).value;
+          callback(undefined, temp);
+          this.gogogateAPI.refreshSensor(service.gateId);
+        }.bind(this)
+      );
   },
 
   bindChargingStateCharacteristic: function (service) {
