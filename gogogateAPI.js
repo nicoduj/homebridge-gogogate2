@@ -1,5 +1,5 @@
 var request = require('request');
-const $ = require('cheerio');
+const Cheerio = require('cheerio');
 const GogogateTools = require('./gogogateTools.js');
 
 var EventEmitter = require('events');
@@ -157,15 +157,17 @@ GogogateAPI.prototype = {
             that.log('ERROR - getDoors - Can not retrieve doors');
             that.emit('doorsRetrieveError');
           } else {
+            var data = Cheerio.load(statusbody);
+
             that.discoverdDoors = [
-              $('input[name="dname1"]', '#config-door1', statusbody).val(),
-              $('input[name="dname2"]', '#config-door2', statusbody).val(),
-              $('input[name="dname3"]', '#config-door3', statusbody).val(),
+              data('input[name="dname1"]', '#config-door1').val(),
+              data('input[name="dname2"]', '#config-door2').val(),
+              data('input[name="dname3"]', '#config-door3').val(),
             ];
             that.discoverdSensors = [
-              $('input[name="door1"]', '#config-door1', statusbody).val(),
-              $('input[name="door2"]', '#config-door2', statusbody).val(),
-              $('input[name="door3"]', '#config-door3', statusbody).val(),
+              data('input[name="door1"]', '#config-door1').val(),
+              data('input[name="door2"]', '#config-door2').val(),
+              data('input[name="door3"]', '#config-door3').val(),
             ];
             that.log.debug('INFO - DOORS NAMES found : ' + that.discoverdDoors);
             that.log.debug('INFO - SENSORS NAMES found : ' + that.discoverdSensors);
