@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2.0.1
+
+- [FIX] moving from request to got
+
 ## 2.0.0
 
 - [FIX] Publish the plugin as ESM for Homebridge v2 compatibility

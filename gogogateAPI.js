@@ -1,10 +1,9 @@
-import requestPkg from 'request';
+import got from 'got';
+import {CookieJar} from 'tough-cookie';
 import * as Cheerio from 'cheerio';
 import * as GogogateTools from './gogogateTools.js';
 import {EventEmitter} from 'events';
 import {inherits} from 'util';
-
-let request = requestPkg.default || requestPkg;
 
 export {GogogateAPI};
 
@@ -18,27 +17,44 @@ function GogogateAPI(log, platform) {
   this.password = platform.password;
   this.discoverdDoors = [];
   this.discoverdSensors = [];
-  request = request.defaults({jar: true});
+
+  // Create instance-specific cookie jar for persistent sessions
+  const cookieJar = new CookieJar();
+  this.request = got.extend({cookieJar, throwHttpErrors: false, responseType: 'text'});
+}
+
+function safeStringify(value) {
+  const seen = new WeakSet();
+  return JSON.stringify(
+    value,
+    (key, val) => {
+      if (typeof val === 'object' && val !== null) {
+        if (seen.has(val)) return '[Circular]';
+        seen.add(val);
+      }
+      return val;
+    },
+    2
+  );
 }
 
 function isLoginError(statuserror) {
+  const code = statuserror?.code;
   return (
-    (statuserror && statuserror.code && statuserror.code.includes('ECONNREFUSED')) ||
-    (statuserror &&
-      (typeof statuserror === 'string' || statuserror instanceof String) &&
-      statuserror.includes('Restricted Access'))
+    (typeof code === 'string' && code.includes('ECONNREFUSED')) ||
+    (typeof statuserror === 'string' && statuserror.includes('Restricted Access'))
   );
 }
 
 function isNetworkError(statuserror) {
+  const code = statuserror?.code;
   return (
-    statuserror &&
-    (statuserror.code.includes('ENETUNREACH') || statuserror.code.includes('EHOSTUNREACH'))
+    typeof code === 'string' && (code.includes('ENETUNREACH') || code.includes('EHOSTUNREACH'))
   );
 }
 
 function isTimeoutError(statuserror) {
-  return statuserror && statuserror.code.includes('ETIMEDOUT');
+  return typeof statuserror?.code === 'string' && statuserror.code.includes('ETIMEDOUT');
 }
 
 GogogateAPI.prototype = {
@@ -99,22 +115,22 @@ GogogateAPI.prototype = {
 
     that.log.debug('INFO - LOGIN - trying to log');
 
-    request.post({url: baseURL, formData: formData}, function optionalCallback(
-      loginerr,
-      loginResponse,
-      loginbody
-    ) {
-      if (loginerr) {
+    that.request
+      .post(baseURL, {form: formData})
+      .then((response) => {
+        const loginbody = response.body;
+        if (loginbody && loginbody.includes('Wrong login or password')) {
+          that.log('ERROR - LOGIN - Wrong login or password');
+          callback(false);
+        } else {
+          that.log.debug('INFO - LOGIN - login ok');
+          callback(true);
+        }
+      })
+      .catch((loginerr) => {
         that.log('ERROR - LOGIN - login failed:', loginerr);
         callback(false);
-      } else if (loginbody && loginbody.includes('Wrong login or password')) {
-        that.log('ERROR - LOGIN - Wrong login or password');
-        callback(false);
-      } else {
-        that.log.debug('INFO - LOGIN - login ok');
-        callback(true);
-      }
-    });
+      });
   },
 
   logout: function (callback) {
@@ -127,21 +143,15 @@ GogogateAPI.prototype = {
 
     that.log.debug('INFO - Logout - trying to logout');
 
-    request.post({url: baseURL, formData: formData}, function optionalCallback(
-      logouterr,
-      logoutResponse,
-      logoutbody
-    ) {
-      if (logouterr) {
-        that.log(
-          'ERROR - LOGOUT - logout failed :',
-          logouterr + '-' + logoutResponse + '-' + logoutbody
-        );
-        callback(false);
-      } else {
+    that.request
+      .post(baseURL, {form: formData})
+      .then(() => {
         callback(true);
-      }
-    });
+      })
+      .catch((logouterr) => {
+        that.log('ERROR - LOGOUT - logout failed :', logouterr);
+        callback(false);
+      });
   },
 
   getDoors: function () {
@@ -151,11 +161,10 @@ GogogateAPI.prototype = {
 
         var that = this;
 
-        request(infoURL, function optionalCallback(statuserror, statusresponse, statusbody) {
-          if (statuserror) {
-            that.log('ERROR - getDoors - Can not retrieve doors');
-            that.emit('doorsRetrieveError');
-          } else {
+        that
+          .request(infoURL)
+          .then((response) => {
+            const statusbody = response.body;
             var data = Cheerio.load(statusbody);
 
             that.discoverdDoors = [
@@ -172,8 +181,11 @@ GogogateAPI.prototype = {
             that.log.debug('INFO - SENSORS NAMES found : ' + that.discoverdSensors);
 
             that.emit('doorsRetrieved');
-          }
-        });
+          })
+          .catch(() => {
+            that.log('ERROR - getDoors - Can not retrieve doors');
+            that.emit('doorsRetrieveError');
+          });
       } else {
         that.emit('doorsRetrieveError');
       }
@@ -185,24 +197,20 @@ GogogateAPI.prototype = {
 
     let infoURL = 'http://' + this.gogogateIP + '/isg/statusDoor.php?numdoor=' + gateId;
 
-    request(infoURL, function optionalCallback(statuserror, statusresponse, statusbody) {
-      that.log.debug(
-        'INFO - statusbody : *' +
-          statusbody +
-          '* - statusresponse : ' +
-          JSON.stringify(statusresponse)
-      );
-
-      if (statuserror) {
-        that.log(
-          'ERROR - refreshDoor - Refreshing status failed - ' + JSON.stringify(statusresponse)
+    that
+      .request(infoURL)
+      .then((response) => {
+        const statusbody = response.body;
+        that.log.debug(
+          'INFO - statusbody : *' + statusbody + '* - statusCode : ' + response.statusCode
         );
+        that.emit('doorRefreshed', gateId, statusbody);
+      })
+      .catch((statuserror) => {
+        that.log('ERROR - refreshDoor - Refreshing status failed - ' + safeStringify(statuserror));
         that.handleError(statuserror);
         that.emit('doorRefreshError', gateId);
-      } else {
-        that.emit('doorRefreshed', gateId, statusbody);
-      }
-    });
+      });
   },
 
   refreshSensor: function (gateId) {
@@ -210,24 +218,28 @@ GogogateAPI.prototype = {
 
     let infoURL = 'http://' + this.gogogateIP + '/isg/temperature.php?door=' + gateId;
 
-    request(infoURL, function optionalCallback(statuserror, statusresponse, statusbody) {
-      if (statuserror) {
+    that
+      .request(infoURL)
+      .then((response) => {
+        const statusbody = response.body;
+        if (!GogogateTools.IsJsonString(statusbody)) {
+          that.log(
+            'ERROR - refreshSensor -  failed - no JSON body -' +
+              statusbody +
+              ' - statusCode: ' +
+              response.statusCode
+          );
+          that.handleError(statusbody);
+          that.emit('sensorRefreshError', gateId);
+        } else {
+          that.emit('sensorRefreshed', gateId, statusbody);
+        }
+      })
+      .catch((statuserror) => {
         that.log('ERROR - refreshSensor -  failed');
         that.handleError(statuserror);
         that.emit('sensorRefreshError', gateId);
-      } else if (!GogogateTools.IsJsonString(statusbody)) {
-        that.log(
-          'ERROR - refreshSensor -  failed - no JSON body -' +
-            statusbody +
-            '-' +
-            JSON.stringify(statusresponse)
-        );
-        that.handleError(statusbody);
-        that.emit('sensorRefreshError', gateId);
-      } else {
-        that.emit('sensorRefreshed', gateId, statusbody);
-      }
-    });
+      });
   },
 
   activateDoor: function (gateId, callback) {
@@ -235,22 +247,20 @@ GogogateAPI.prototype = {
 
     var that = this;
 
-    request(commandURL, function optionalCallback(statuserror, statusresponse, statusbody) {
-      if (statuserror) {
+    that
+      .request(commandURL)
+      .then(() => {
+        that.log.debug('INFO - activateDoor - Command sent');
+        callback(false);
+      })
+      .catch((statuserror) => {
         that.log(
-          'ERROR - activateDoor - ERROR while sending command -' +
-            statusbody +
-            '-' +
-            JSON.stringify(statusresponse)
+          'ERROR - activateDoor - ERROR while sending command -' + safeStringify(statuserror)
         );
         that.handleError(statuserror);
 
         callback(true);
-      } else {
-        that.log.debug('INFO - activateDoor - Command sent');
-        callback(false);
-      }
-    });
+      });
   },
 };
 
