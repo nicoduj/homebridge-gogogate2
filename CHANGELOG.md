@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2.0.0
+
+- [FIX] Publish the plugin as ESM for Homebridge v2 compatibility
+- [FIX] Update Homebridge and Node.js engine requirements for Homebridge v2
+
 ## 1.1.5
 
 - [FIX] fixing incompatibility with updated dep (cheerio) #48 #49

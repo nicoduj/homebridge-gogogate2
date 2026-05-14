@@ -1,20 +1,19 @@
 var Service, Characteristic, Accessory, UUIDGen;
 
-var GogogateAPI = require('./gogogateAPI.js').GogogateAPI;
-const GogogateTools = require('./gogogateTools.js');
+import {GogogateAPI} from './gogogateAPI.js';
+import * as GogogateTools from './gogogateTools.js';
 
 String.prototype.isEmpty = function () {
   return this.length === 0 || !this.trim();
 };
 
-module.exports = function (homebridge) {
+export default function (homebridge) {
   Service = homebridge.hap.Service;
   Characteristic = homebridge.hap.Characteristic;
   Accessory = homebridge.platformAccessory;
   UUIDGen = homebridge.hap.uuid;
-  HomebridgeAPI = homebridge;
   homebridge.registerPlatform('homebridge-gogogate2', 'GogoGate2', Gogogate2Platform, true);
-};
+}
 
 function Gogogate2Platform(log, config, api) {
   if (!config) {
@@ -235,7 +234,7 @@ Gogogate2Platform.prototype = {
           myGogogateDoorAccessory.gateId = i + 1;
           myGogogateDoorAccessory.name = doorName;
 
-          let HKService = myGogogateDoorAccessory.getServiceByUUIDAndSubType(
+          let HKService = myGogogateDoorAccessory.getServiceById(
             doorName,
             'GarageDoorOpener' + doorName
           );
@@ -259,7 +258,7 @@ Gogogate2Platform.prototype = {
           if (sensors[i] && !sensors[i].isEmpty()) {
             this.log('INFO - Discovered sensor : ' + sensors[i]);
 
-            let HKService1 = myGogogateDoorAccessory.getServiceByUUIDAndSubType(
+            let HKService1 = myGogogateDoorAccessory.getServiceById(
               doorName,
               'BatteryService' + sensors[i]
             );
@@ -268,7 +267,7 @@ Gogogate2Platform.prototype = {
               this.log(
                 'INFO - Creating  Service ' + doorName + '/' + 'BatteryService' + sensors[i]
               );
-              HKService1 = new Service.BatteryService(doorName, 'BatteryService' + sensors[i]);
+              HKService1 = new Service.Battery(doorName, 'BatteryService' + sensors[i]);
               HKService1.subtype = 'BatteryService' + sensors[i];
               myGogogateDoorAccessory.addService(HKService1);
             }
@@ -278,10 +277,7 @@ Gogogate2Platform.prototype = {
             this.bindChargingStateCharacteristic(HKService1);
             this.bindStatusLowBatteryCharacteristic(HKService1);
 
-            let HKService2 = myGogogateDoorAccessory.getServiceByUUIDAndSubType(
-              doorName,
-              'Temp' + sensors[i]
-            );
+            let HKService2 = myGogogateDoorAccessory.getServiceById(doorName, 'Temp' + sensors[i]);
 
             if (!HKService2) {
               this.log('INFO - Creating  Service ' + doorName + '/' + 'Temp' + sensors[i]);
@@ -339,7 +335,7 @@ Gogogate2Platform.prototype = {
     let myGogogateDoorAccessory = this.foundAccessories.find((x) => x.gateId == gateId);
 
     if (myGogogateDoorAccessory) {
-      service = myGogogateDoorAccessory.getServiceByUUIDAndSubType(
+      service = myGogogateDoorAccessory.getServiceById(
         myGogogateDoorAccessory.name,
         'GarageDoorOpener' + myGogogateDoorAccessory.name
       );
@@ -436,7 +432,7 @@ Gogogate2Platform.prototype = {
         let service = myGogogateDoorAccessory.services[s];
         if (service.UUID == Service.TemperatureSensor.UUID) {
           tempService = service;
-        } else if (service.UUID == Service.BatteryService.UUID) {
+        } else if (service.UUID == Service.Battery.UUID) {
           batteryService = service;
         }
       }

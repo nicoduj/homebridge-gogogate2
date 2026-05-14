@@ -1,8 +1,9 @@
 {
   "name": "homebridge-gogogate2",
-  "version": "1.1.5",
+  "version": "2.0.0",
   "author": "Nicolas Dujardin",
   "description": "Publish your gogogate 2 to homebridge",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "test": "node index.js && echo \"No syntax errors! (node $(node -v))\""
@@ -13,8 +14,8 @@
     "url": "git+https://github.com/nicoduj/homebridge-gogogate2.git"
   },
   "engines": {
-    "homebridge": ">=0.4.50",
-    "node": ">=10.20.0"
+    "homebridge": "^1.8.0 || ^2.0.0",
+    "node": "^22 || ^24 || ^26"
   },
   "keywords": [
     "homebridge-plugin",
@@ -23,7 +24,7 @@
     "homekit"
   ],
   "dependencies": {
-    "cheerio": "^1.0.0-rc.9",
+    "cheerio": "^1.1.2",
     "request": "^2.88.2"
   },
   "bugs": {

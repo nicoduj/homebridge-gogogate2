@@ -1,13 +1,12 @@
-var request = require('request');
-const Cheerio = require('cheerio');
-const GogogateTools = require('./gogogateTools.js');
+import requestPkg from 'request';
+import * as Cheerio from 'cheerio';
+import * as GogogateTools from './gogogateTools.js';
+import {EventEmitter} from 'events';
+import {inherits} from 'util';
 
-var EventEmitter = require('events');
-var inherits = require('util').inherits;
+let request = requestPkg.default || requestPkg;
 
-module.exports = {
-  GogogateAPI: GogogateAPI,
-};
+export {GogogateAPI};
 
 function GogogateAPI(log, platform) {
   EventEmitter.call(this);
