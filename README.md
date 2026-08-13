@@ -65,6 +65,7 @@ See [CHANGELOG][].
 Thanks to :
 
 - [dlbroadfoot] for the API calls.
+- [jatitoam] for his pull requests
 - every tester / contributor that test, and give feedback in any way !
 
 [dlbroadfoot] https://github.com/dlbroadfoot/pygogogate2
