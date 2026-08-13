@@ -57,6 +57,15 @@ function isTimeoutError(statuserror) {
   return typeof statuserror?.code === 'string' && statuserror.code.includes('ETIMEDOUT');
 }
 
+//statusDoor.php only ever answers 'OK' or 'FAIL'. Once the gogogate PHP session has
+//expired it answers HTTP 200 with an empty body instead - and since got is configured
+//with throwHttpErrors:false that lands in the success branch. Treating such a body as a
+//door state silently reports the door as CLOSED forever, so it must be detected here.
+function isDoorStatusBody(statusbody) {
+  const body = typeof statusbody === 'string' ? statusbody.trim() : '';
+  return body === 'OK' || body === 'FAIL';
+}
+
 GogogateAPI.prototype = {
   getStateString: function (state) {
     if (state == 0) return 'OPEN';
@@ -192,7 +201,7 @@ GogogateAPI.prototype = {
     });
   },
 
-  refreshDoor: function (gateId) {
+  refreshDoor: function (gateId, isRetry) {
     var that = this;
 
     let infoURL = 'http://' + this.gogogateIP + '/isg/statusDoor.php?numdoor=' + gateId;
@@ -204,7 +213,33 @@ GogogateAPI.prototype = {
         that.log.debug(
           'INFO - statusbody : *' + statusbody + '* - statusCode : ' + response.statusCode
         );
-        that.emit('doorRefreshed', gateId, statusbody);
+
+        if (isDoorStatusBody(statusbody)) {
+          that.emit('doorRefreshed', gateId, statusbody.trim());
+          return;
+        }
+
+        //No usable status: the session has almost certainly expired. Log in again and
+        //retry once rather than reporting a bogus door state.
+        if (isRetry) {
+          that.log(
+            'ERROR - refreshDoor - no valid status after re-login (body : *' +
+              statusbody +
+              '*)'
+          );
+          that.emit('doorRefreshError', gateId);
+          return;
+        }
+
+        that.log.debug('INFO - refreshDoor - invalid status body, logging in again and retrying');
+        that.login((success) => {
+          if (success) {
+            that.refreshDoor(gateId, true);
+          } else {
+            that.log('ERROR - refreshDoor - re-login failed');
+            that.emit('doorRefreshError', gateId);
+          }
+        });
       })
       .catch((statuserror) => {
         that.log('ERROR - refreshDoor - Refreshing status failed - ' + safeStringify(statuserror));
@@ -242,25 +277,61 @@ GogogateAPI.prototype = {
       });
   },
 
-  activateDoor: function (gateId, callback) {
-    let commandURL = 'http://' + this.gogogateIP + '/isg/opendoor.php?numdoor=' + gateId;
-
+  //Checks the session is still alive, logging in again if it is not. Used before sending
+  //a command so that an expired session never results in a command silently going nowhere.
+  ensureSession: function (gateId, callback) {
     var that = this;
 
+    let infoURL = 'http://' + this.gogogateIP + '/isg/statusDoor.php?numdoor=' + gateId;
+
     that
-      .request(commandURL)
-      .then(() => {
-        that.log.debug('INFO - activateDoor - Command sent');
-        callback(false);
+      .request(infoURL)
+      .then((response) => {
+        if (isDoorStatusBody(response.body)) {
+          callback(true);
+          return;
+        }
+
+        that.log.debug('INFO - ensureSession - session expired, logging in again');
+        that.login(callback);
       })
       .catch((statuserror) => {
-        that.log(
-          'ERROR - activateDoor - ERROR while sending command -' + safeStringify(statuserror)
-        );
+        that.log('ERROR - ensureSession - could not reach gogogate');
         that.handleError(statuserror);
-
-        callback(true);
+        callback(false);
       });
+  },
+
+  activateDoor: function (gateId, callback) {
+    var that = this;
+
+    //The session is validated BEFORE actuating, never after : opendoor.php drives the
+    //relay, so the command must not be retried once it has been sent - a retry would
+    //move the door a second time.
+    that.ensureSession(gateId, (sessionOK) => {
+      if (!sessionOK) {
+        that.log('ERROR - activateDoor - no valid session, command NOT sent');
+        callback(true);
+        return;
+      }
+
+      let commandURL = 'http://' + that.gogogateIP + '/isg/opendoor.php?numdoor=' + gateId;
+
+      that
+        .request(commandURL)
+        .then(() => {
+          that.log.debug('INFO - activateDoor - Command sent');
+          callback(false);
+        })
+        .catch((statuserror) => {
+          that.log(
+            'ERROR - activateDoor - ERROR while sending command -' + safeStringify(statuserror)
+          );
+          that.handleError(statuserror);
+
+          callback(true);
+        });
+    });
   },
 };
 

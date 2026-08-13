@@ -165,6 +165,7 @@ Gogogate2Platform.prototype = {
 
     this.gogogateAPI.on('doorRefreshError', (gateId) => {
       this.log.debug('INFO - doorRefreshError event -' + gateId);
+      this.endTimedOutOperation(gateId);
       if (this.timerID == undefined) {
         this.log('ERROR - doorRefreshError - will retry in 1 minute');
         setTimeout(() => {
@@ -306,6 +307,30 @@ Gogogate2Platform.prototype = {
       setTimeout(() => {
         this.gogogateAPI.getDoors();
       }, 60000);
+    }
+  },
+
+  //An unusable status no longer ends an operation through endOperation(), so a door being
+  //operated while the gogogate cannot be read must still be able to time out - otherwise
+  //it would stay stuck in Opening/Closing indefinitely.
+  endTimedOutOperation(gateId) {
+    let myGogogateDoorAccessory = this.foundAccessories.find((x) => x.gateId == gateId);
+    if (!myGogogateDoorAccessory) return;
+
+    let service = myGogogateDoorAccessory.getServiceById(
+      myGogogateDoorAccessory.name,
+      'GarageDoorOpener' + myGogogateDoorAccessory.name
+    );
+    if (!service || service.TargetDoorStateOperationStart === undefined) return;
+
+    let elapsedTime = Date.now() - service.TargetDoorStateOperationStart;
+    if (elapsedTime > this.maxWaitTimeForOperation * 1000) {
+      this.log(
+        'WARNING - doorRefreshError - ' +
+          service.subtype +
+          ' - no valid status retrieved, ending operation after timeout'
+      );
+      this.endDoorOperation(service);
     }
   },
 
